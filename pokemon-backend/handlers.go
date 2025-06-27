@@ -5,6 +5,7 @@ import (
 	"log"
 	"net/http"
 
+	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/gin"
 )
 
@@ -19,14 +20,17 @@ type Team struct {
 func SaveTeamHandler(c *gin.Context) {
 	var team Team
 	if err := c.ShouldBindJSON(&team); err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		log.Println("❌ JSON Binding Error:", err)
+		c.JSON(http.StatusBadRequest, gin.H{"error": "Invalid JSON"})
 		return
 	}
+
+	log.Printf("📥 Incoming Team: %+v\n", team)
 
 	ctx := context.Background()
 	client, err := firestoreClient.Firestore(ctx)
 	if err != nil {
-		log.Println("Firestore error:", err)
+		log.Println("❌ Firestore Init Error:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Firestore init error"})
 		return
 	}
@@ -41,12 +45,15 @@ func SaveTeamHandler(c *gin.Context) {
 		})
 
 	if err != nil {
+		log.Println("❌ Firestore Write Error:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to save team"})
 		return
 	}
 
+	log.Println("✅ Team saved successfully")
 	c.JSON(http.StatusOK, gin.H{"message": "Team saved to Firestore"})
 }
+
 
 // GetTeamsHandler gets teams from Firestore
 func GetTeamsHandler(c *gin.Context) {
@@ -82,11 +89,20 @@ func GetTeamsHandler(c *gin.Context) {
 
 func toStringSlice(v interface{}) []string {
 	var result []string
-	switch val := v.(type) {
-	case []interface{}:
-		for _, item := range val {
-			result = append(result, item.(string))
+	val, ok := v.([]interface{})
+	if !ok {
+		log.Printf("⚠️ Unexpected type for pokemons: %T\n", v)
+		return result
+	}
+
+	for _, item := range val {
+		str, ok := item.(string)
+		if ok {
+			result = append(result, str)
+		} else {
+			log.Printf("⚠️ Skipping non-string item in pokemons: %v\n", item)
 		}
 	}
 	return result
 }
+

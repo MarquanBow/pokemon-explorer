@@ -1,6 +1,6 @@
 import axios from "axios";
 
-const API_BASE = "https://your-render-subdomain.onrender.com";
+const API_BASE = "https://pokemon-api-r8sq.onrender.com";
 
 // Save a team
 export async function saveTeam(teamData) {
