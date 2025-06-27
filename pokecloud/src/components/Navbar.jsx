@@ -13,7 +13,6 @@ export default function Navbar() {
       <Link to="/" style={{ color: "white", fontWeight: "bold" }}>🏠 Home</Link>
       <Link to="/team-builder" style={{ color: "white", fontWeight: "bold" }}>🛠️ Team Builder</Link>
       <Link to="/search" style={{ color: "white", fontWeight: "bold" }}>🔍 Search</Link>
-      <Link to="/timeline" style={{ color: "white", fontWeight: "bold" }}>📘 Pokédex Timeline</Link>
     </nav>
   );
 }

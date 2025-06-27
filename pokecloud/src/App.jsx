@@ -4,7 +4,6 @@ import Layout from "./components/Layout";
 import Home from "./pages/Home";
 import PokemonDetail from "./pages/PokemonDetail";
 import TeamBuilder from "./pages/TeamBuilder"; 
-import PokedexTimeline from "./pages/PokedexTimeline";
 import PokemonSearch from "./pages/PokemonSearch";
 
 function App() {
@@ -15,7 +14,6 @@ function App() {
         <Route path="/" element={<Home />} />
         <Route path="/pokemon/:name" element={<PokemonDetail />} />
         <Route path="/team-builder" element={<TeamBuilder />}  /> 
-        <Route path="/timeline" element={<PokedexTimeline />} />
         <Route path="/search" element={<PokemonSearch />} />
       </Routes>
       </Layout>
