@@ -5,18 +5,20 @@ export default function PokedexExplorer() {
   const [generations, setGenerations] = useState([]);
   const [types, setTypes] = useState([]);
   const [abilities, setAbilities] = useState([]);
-  const [regions, setRegions] = useState([]);
 
   const [selectedGeneration, setSelectedGeneration] = useState("");
   const [selectedType, setSelectedType] = useState("");
   const [selectedAbility, setSelectedAbility] = useState("");
-  const [selectedRegion, setSelectedRegion] = useState("");
 
   const [searchTerm, setSearchTerm] = useState("");
-  const [filteredPokemon, setFilteredPokemon] = useState([]);
-  const [allPokemonInGen, setAllPokemonInGen] = useState([]);
 
-  // Fetch initial data for filters
+  const [allPokemonInGen, setAllPokemonInGen] = useState([]);
+  const [filteredPokemon, setFilteredPokemon] = useState([]);
+
+  const [typeFilteredNames, setTypeFilteredNames] = useState(null);
+  const [abilityFilteredNames, setAbilityFilteredNames] = useState(null);
+
+  // Fetch dropdown filter data on mount
   useEffect(() => {
     fetch("https://pokeapi.co/api/v2/generation")
       .then((res) => res.json())
@@ -26,16 +28,12 @@ export default function PokedexExplorer() {
       .then((res) => res.json())
       .then((data) => setTypes(data.results));
 
-    fetch("https://pokeapi.co/api/v2/ability?limit=50")
+    fetch("https://pokeapi.co/api/v2/ability?limit=150")
       .then((res) => res.json())
       .then((data) => setAbilities(data.results));
-
-    fetch("https://pokeapi.co/api/v2/region")
-      .then((res) => res.json())
-      .then((data) => setRegions(data.results));
   }, []);
 
-  // When generation changes, fetch Pokémon for that generation
+  // Fetch Pokémon from selected generation
   useEffect(() => {
     if (!selectedGeneration) {
       setAllPokemonInGen([]);
@@ -45,26 +43,72 @@ export default function PokedexExplorer() {
     fetch(selectedGeneration)
       .then((res) => res.json())
       .then((data) => {
-        setAllPokemonInGen(data.pokemon_species);
+        const sorted = data.pokemon_species.sort((a, b) =>
+          a.name.localeCompare(b.name)
+        );
+        setAllPokemonInGen(sorted);
       });
   }, [selectedGeneration]);
 
-  // Filter Pokémon based on search term and filters
+  // Fetch Pokémon names by type
+  useEffect(() => {
+    if (!selectedType) {
+      setTypeFilteredNames(null);
+      return;
+    }
+
+    fetch(`https://pokeapi.co/api/v2/type/${selectedType}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const names = data.pokemon.map((p) => p.pokemon.name);
+        setTypeFilteredNames(names);
+      });
+  }, [selectedType]);
+
+  // Fetch Pokémon names by ability
+  useEffect(() => {
+    if (!selectedAbility) {
+      setAbilityFilteredNames(null);
+      return;
+    }
+
+    fetch(`https://pokeapi.co/api/v2/ability/${selectedAbility}`)
+      .then((res) => res.json())
+      .then((data) => {
+        const names = data.pokemon.map((p) => p.pokemon.name);
+        setAbilityFilteredNames(names);
+      });
+  }, [selectedAbility]);
+
+  // Filtering logic
   useEffect(() => {
     if (allPokemonInGen.length === 0) {
       setFilteredPokemon([]);
       return;
     }
 
-    // Filter by search term (name)
-    let filtered = allPokemonInGen.filter((p) =>
-      p.name.toLowerCase().includes(searchTerm.toLowerCase())
+    let filtered = allPokemonInGen.map((p) => p.name);
+
+    if (typeFilteredNames) {
+      filtered = filtered.filter((name) => typeFilteredNames.includes(name));
+    }
+
+    if (abilityFilteredNames) {
+      filtered = filtered.filter((name) => abilityFilteredNames.includes(name));
+    }
+
+    if (searchTerm) {
+      filtered = filtered.filter((name) =>
+        name.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    const finalList = filtered.map((name) =>
+      allPokemonInGen.find((p) => p.name === name)
     );
 
-    // We'll filter by type, ability, and region later (because it needs extra data fetching)
-    // For now, just set filtered to the search filtered list
-    setFilteredPokemon(filtered);
-  }, [searchTerm, allPokemonInGen]);
+    setFilteredPokemon(finalList);
+  }, [searchTerm, allPokemonInGen, typeFilteredNames, abilityFilteredNames]);
 
   return (
     <div style={{ maxWidth: "1000px", margin: "0 auto", padding: "2rem" }}>
@@ -88,8 +132,16 @@ export default function PokedexExplorer() {
       </div>
 
       {/* Filters */}
-      <div style={{ display: "flex", justifyContent: "center", gap: "1rem", flexWrap: "wrap", marginBottom: "2rem" }}>
-        {/* Generation Select */}
+      <div
+        style={{
+          display: "flex",
+          justifyContent: "center",
+          gap: "1rem",
+          flexWrap: "wrap",
+          marginBottom: "2rem",
+        }}
+      >
+        {/* Generation Filter */}
         <select
           value={selectedGeneration}
           onChange={(e) => setSelectedGeneration(e.target.value)}
@@ -103,7 +155,7 @@ export default function PokedexExplorer() {
           ))}
         </select>
 
-        {/* Type Select */}
+        {/* Type Filter */}
         <select
           value={selectedType}
           onChange={(e) => setSelectedType(e.target.value)}
@@ -117,7 +169,7 @@ export default function PokedexExplorer() {
           ))}
         </select>
 
-        {/* Ability Select */}
+        {/* Ability Filter */}
         <select
           value={selectedAbility}
           onChange={(e) => setSelectedAbility(e.target.value)}
@@ -131,22 +183,11 @@ export default function PokedexExplorer() {
           ))}
         </select>
 
-        {/* Region Select */}
-        <select
-          value={selectedRegion}
-          onChange={(e) => setSelectedRegion(e.target.value)}
-          style={{ padding: "0.5rem", borderRadius: "8px", fontSize: "1rem" }}
-        >
-          <option value="">Select Region</option>
-          {regions.map((region) => (
-            <option key={region.name} value={region.name}>
-              {region.name.charAt(0).toUpperCase() + region.name.slice(1)}
-            </option>
-          ))}
-        </select>
+        {/* Region Filter (can be implemented later) */}
+        {/* Add here if region-to-Pokémon mapping is needed */}
       </div>
 
-      {/* Pokémon List */}
+      {/* Pokémon Display Grid */}
       <div
         style={{
           display: "grid",
