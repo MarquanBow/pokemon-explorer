@@ -17,7 +17,7 @@ func initFirebase() {
 	ctx := context.Background()
 
 	// If you're running locally:
-	opt := option.WithCredentialsFile("serviceAccountKey.json")
+	opt := option.WithCredentialsFile("/etc/secrets/serviceAccountKey.json")
 
 	// If you're on Render, update the path:
 	// opt := option.WithCredentialsFile("/etc/secrets/serviceAccountKey.json")
