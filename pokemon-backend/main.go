@@ -1,19 +1,52 @@
 package main
 
 import (
-	"github.com/gin-gonic/gin"
+	"context"
+	"log"
 	"net/http"
+
+	"firebase.google.com/go/v4"
+	"github.com/gin-gonic/gin"
+	"google.golang.org/api/option"
 )
 
-func main() {
-	r := gin.Default()
+var firestoreClient *firebase.App
 
-	r.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"status": "ok"})
+// Initialize Firebase App with Admin SDK
+func initFirebase() {
+	ctx := context.Background()
+
+	// If you're running locally:
+	opt := option.WithCredentialsFile("serviceAccountKey.json")
+
+	// If you're on Render, update the path:
+	// opt := option.WithCredentialsFile("/etc/secrets/serviceAccountKey.json")
+
+	app, err := firebase.NewApp(ctx, nil, opt)
+	if err != nil {
+		log.Fatalf("❌ Error initializing Firebase app: %v\n", err)
+	}
+
+	firestoreClient = app
+}
+
+func main() {
+	// Set up Firebase
+	initFirebase()
+
+	// Set up Gin router
+	router := gin.Default()
+
+	// Health check
+	router.GET("/health", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
 	})
 
-	r.POST("/teams/save", SaveTeamHandler)
-	r.GET("/teams/:userId", GetTeamsHandler)
+	// Pokémon team endpoints
+	router.POST("/teams/save", SaveTeamHandler)
+	router.GET("/teams/:userId", GetTeamsHandler)
 
-	r.Run(":8080") // localhost:8080
+	// Start server on localhost:8080
+	log.Println("🚀 Server running on http://localhost:8080")
+	router.Run(":8080")
 }
