@@ -6,7 +6,6 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"cloud.google.com/go/firestore"
 )
 
 // SaveTeamHandler saves a team to Firestore
