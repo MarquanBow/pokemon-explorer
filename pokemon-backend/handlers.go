@@ -8,6 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+
+type Team struct {
+	UserID   string   `json:"userId"`
+	TeamName string   `json:"teamName"`
+	Pokemons []string `json:"pokemons"`
+}
+
 // SaveTeamHandler saves a team to Firestore
 func SaveTeamHandler(c *gin.Context) {
 	var team Team
