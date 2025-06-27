@@ -9,5 +9,6 @@ export async function saveTeam(teamData) {
 
 // Get all teams by user ID
 export async function getTeams(userId) {
-  return axios.get(`${API_BASE}/teams/${userId}`);
+  const res = await axios.get(`${API_BASE}/teams/${userId}`);
+  return res.data;
 }

@@ -1,6 +1,8 @@
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { saveTeam } from "../api"; // Your API helper
+import { saveTeam, getTeams } from "../api";
+import { auth } from "../firebase";
+import { onAuthStateChanged } from "firebase/auth";
 
 const cardStyle = {
   backgroundColor: "#fff",
@@ -22,13 +24,49 @@ const typeBadgeStyle = {
 };
 
 export default function TeamBuilder() {
+  const [user, setUser] = useState(null);
   const [team, setTeam] = useState([]);
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResult, setSearchResult] = useState(null);
   const [searchError, setSearchError] = useState("");
-  const [teamName, setTeamName] = useState(""); // New team name state
+  const [teamName, setTeamName] = useState("");
 
-  // Search Pokémon by name
+  useEffect(() => {
+    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
+      setUser(currentUser);
+    });
+    return unsubscribe;
+  }, []);
+
+  // Fetch saved teams on login
+  useEffect(() => {
+    if (!user) {
+      setTeam([]);
+      setTeamName("");
+      return;
+    }
+
+    const loadTeams = async () => {
+      try {
+        const teams = await getTeams(user.uid);
+        if (teams.length > 0) {
+          setTeamName(teams[0].teamName);
+          setTeam(
+            teams[0].pokemons.map((name) => ({
+              name,
+              sprite: `https://img.pokemondb.net/sprites/home/normal/${name}.png`, // fallback sprite
+              types: [], // you can optionally fetch detailed data here
+            }))
+          );
+        }
+      } catch (err) {
+        console.error("Failed to fetch teams:", err);
+      }
+    };
+
+    loadTeams();
+  }, [user]);
+
   const handleSearch = async () => {
     if (!searchTerm) return;
     setSearchError("");
@@ -50,7 +88,6 @@ export default function TeamBuilder() {
     }
   };
 
-  // Add Pokémon to team (max 6)
   const addToTeam = (pokemon) => {
     if (team.length >= 6) return alert("Team is full! Max 6 Pokémon.");
     if (team.find((p) => p.name === pokemon.name)) return alert("Already in team!");
@@ -59,13 +96,15 @@ export default function TeamBuilder() {
     setSearchTerm("");
   };
 
-  // Remove Pokémon from team
   const removeFromTeam = (name) => {
     setTeam(team.filter((p) => p.name !== name));
   };
 
-  // Save team handler wired to API call
   const handleSaveTeam = async () => {
+    if (!user) {
+      alert("Please log in to save your team.");
+      return;
+    }
     if (!teamName) {
       alert("Please enter a team name before saving.");
       return;
@@ -76,7 +115,7 @@ export default function TeamBuilder() {
     }
 
     const teamData = {
-      userId: "marquan123", // Replace with actual user ID after auth setup
+      userId: user.uid,
       teamName,
       pokemons: team.map((p) => p.name),
     };
@@ -84,7 +123,7 @@ export default function TeamBuilder() {
     try {
       await saveTeam(teamData);
       alert("Team saved successfully!");
-      setTeamName(""); // Reset input after saving
+      setTeamName("");
     } catch (err) {
       console.error("Error saving team", err);
       alert("Failed to save team.");
@@ -95,7 +134,6 @@ export default function TeamBuilder() {
     <div style={{ maxWidth: "900px", margin: "0 auto", padding: "2rem" }}>
       <h1 style={{ textAlign: "center", color: "#ef233c" }}>🛠️ Build Your Pokémon Team</h1>
 
-      {/* Team name input */}
       <div style={{ textAlign: "center", marginBottom: "1rem" }}>
         <input
           type="text"
@@ -112,13 +150,13 @@ export default function TeamBuilder() {
         />
       </div>
 
-      {/* Search */}
       <div style={{ textAlign: "center", marginBottom: "2rem" }}>
         <input
           type="text"
           placeholder="Search Pokémon by name"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
           style={{
             padding: "0.5rem 1rem",
             fontSize: "1rem",
@@ -126,7 +164,6 @@ export default function TeamBuilder() {
             border: "1px solid #ccc",
             width: "250px",
           }}
-          onKeyDown={(e) => e.key === "Enter" && handleSearch()}
         />
         <button
           onClick={handleSearch}
@@ -145,10 +182,8 @@ export default function TeamBuilder() {
         </button>
       </div>
 
-      {/* Search Result */}
       <div style={{ textAlign: "center", marginBottom: "2rem" }}>
         {searchError && <p style={{ color: "red" }}>{searchError}</p>}
-
         {searchResult && (
           <motion.div
             style={cardStyle}
@@ -156,7 +191,9 @@ export default function TeamBuilder() {
             animate={{ opacity: 1, y: 0 }}
           >
             <img src={searchResult.sprite} alt={searchResult.name} width={100} />
-            <h3 style={{ margin: "0.5rem 0", color: "#023047" }}>{searchResult.name.toUpperCase()}</h3>
+            <h3 style={{ margin: "0.5rem 0", color: "#023047" }}>
+              {searchResult.name.toUpperCase()}
+            </h3>
             <div>
               {searchResult.types.map((type) => (
                 <span
@@ -185,7 +222,6 @@ export default function TeamBuilder() {
         )}
       </div>
 
-      {/* Team */}
       <h2 style={{ textAlign: "center", marginBottom: "1rem", color: "#023047" }}>
         Your Team ({team.length}/6)
       </h2>
@@ -213,7 +249,6 @@ export default function TeamBuilder() {
               Your team is empty! Search for Pokémon above to add it.
             </motion.p>
           )}
-
           {team.map((p) => (
             <motion.div
               key={p.name}
@@ -223,7 +258,9 @@ export default function TeamBuilder() {
               exit={{ opacity: 0, y: 20 }}
             >
               <img src={p.sprite} alt={p.name} width={100} />
-              <h3 style={{ margin: "0.5rem 0", color: "#023047" }}>{p.name.toUpperCase()}</h3>
+              <h3 style={{ margin: "0.5rem 0", color: "#023047" }}>
+                {p.name.toUpperCase()}
+              </h3>
               <div>
                 {p.types.map((type) => (
                   <span
@@ -253,28 +290,32 @@ export default function TeamBuilder() {
         </AnimatePresence>
       </div>
 
-      {/* Save Team Button */}
       <div style={{ textAlign: "center", marginTop: "2rem" }}>
         <button
           onClick={handleSaveTeam}
+          disabled={!user}
           style={{
-            backgroundColor: "#0077b6",
+            backgroundColor: user ? "#0077b6" : "#ccc",
             color: "white",
             border: "none",
             padding: "0.75rem 2rem",
             borderRadius: "8px",
             fontSize: "1.1rem",
-            cursor: "pointer",
+            cursor: user ? "pointer" : "not-allowed",
           }}
         >
           Save Team
         </button>
+        {!user && (
+          <p style={{ color: "red", marginTop: "0.5rem" }}>
+            Please log in to save your team.
+          </p>
+        )}
       </div>
     </div>
   );
 }
 
-// Helper function for type badge colors
 function getTypeColor(type) {
   const colors = {
     fire: "#f94144",

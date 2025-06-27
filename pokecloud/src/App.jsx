@@ -5,6 +5,7 @@ import Home from "./pages/Home";
 import PokemonDetail from "./pages/PokemonDetail";
 import TeamBuilder from "./pages/TeamBuilder"; 
 import PokemonSearch from "./pages/PokemonSearch";
+import Auth from "./components/Auth"; 
 
 function App() {
   return (
