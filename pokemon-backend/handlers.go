@@ -5,7 +5,6 @@ import (
 	"log"
 	"net/http"
 
-	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/gin"
 )
 
