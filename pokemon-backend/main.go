@@ -4,8 +4,10 @@ import (
 	"context"
 	"log"
 	"net/http"
+	"time"
 
 	"firebase.google.com/go/v4"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"google.golang.org/api/option"
 )
@@ -16,11 +18,8 @@ var firestoreClient *firebase.App
 func initFirebase() {
 	ctx := context.Background()
 
-	// If you're running locally:
+	// Use your Render secret or local service account key
 	opt := option.WithCredentialsFile("/etc/secrets/serviceAccountKey.json")
-
-	// If you're on Render, update the path:
-	// opt := option.WithCredentialsFile("/etc/secrets/serviceAccountKey.json")
 
 	app, err := firebase.NewApp(ctx, nil, opt)
 	if err != nil {
@@ -37,6 +36,16 @@ func main() {
 	// Set up Gin router
 	router := gin.Default()
 
+	// Apply CORS middleware
+	router.Use(cors.New(cors.Config{
+		AllowOrigins:     []string{"http://localhost:5173", "https://pokemon-api-r8sq.onrender.com/"},
+		AllowMethods:     []string{"GET", "POST", "PUT", "DELETE", "OPTIONS"},
+		AllowHeaders:     []string{"Origin", "Content-Type", "Authorization"},
+		ExposeHeaders:    []string{"Content-Length"},
+		AllowCredentials: true,
+		MaxAge:           12 * time.Hour,
+	}))
+
 	// Health check
 	router.GET("/health", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"status": "healthy"})
@@ -46,7 +55,7 @@ func main() {
 	router.POST("/teams/save", SaveTeamHandler)
 	router.GET("/teams/:userId", GetTeamsHandler)
 
-	// Start server on localhost:8080
+	// Start server
 	log.Println("🚀 Server running on http://localhost:8080")
 	router.Run(":8080")
 }

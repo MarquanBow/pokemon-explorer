@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { saveTeam } from "../api"; // Your API helper
 
 const cardStyle = {
   backgroundColor: "#fff",
@@ -25,6 +26,7 @@ export default function TeamBuilder() {
   const [searchTerm, setSearchTerm] = useState("");
   const [searchResult, setSearchResult] = useState(null);
   const [searchError, setSearchError] = useState("");
+  const [teamName, setTeamName] = useState(""); // New team name state
 
   // Search Pokémon by name
   const handleSearch = async () => {
@@ -62,9 +64,53 @@ export default function TeamBuilder() {
     setTeam(team.filter((p) => p.name !== name));
   };
 
+  // Save team handler wired to API call
+  const handleSaveTeam = async () => {
+    if (!teamName) {
+      alert("Please enter a team name before saving.");
+      return;
+    }
+    if (team.length === 0) {
+      alert("Add at least one Pokémon to your team before saving.");
+      return;
+    }
+
+    const teamData = {
+      userId: "marquan123", // Replace with actual user ID after auth setup
+      teamName,
+      pokemons: team.map((p) => p.name),
+    };
+
+    try {
+      await saveTeam(teamData);
+      alert("Team saved successfully!");
+      setTeamName(""); // Reset input after saving
+    } catch (err) {
+      console.error("Error saving team", err);
+      alert("Failed to save team.");
+    }
+  };
+
   return (
     <div style={{ maxWidth: "900px", margin: "0 auto", padding: "2rem" }}>
       <h1 style={{ textAlign: "center", color: "#ef233c" }}>🛠️ Build Your Pokémon Team</h1>
+
+      {/* Team name input */}
+      <div style={{ textAlign: "center", marginBottom: "1rem" }}>
+        <input
+          type="text"
+          placeholder="Enter your team name"
+          value={teamName}
+          onChange={(e) => setTeamName(e.target.value)}
+          style={{
+            padding: "0.5rem 1rem",
+            fontSize: "1rem",
+            borderRadius: "8px",
+            border: "1px solid #ccc",
+            width: "300px",
+          }}
+        />
+      </div>
 
       {/* Search */}
       <div style={{ textAlign: "center", marginBottom: "2rem" }}>
@@ -206,10 +252,29 @@ export default function TeamBuilder() {
           ))}
         </AnimatePresence>
       </div>
+
+      {/* Save Team Button */}
+      <div style={{ textAlign: "center", marginTop: "2rem" }}>
+        <button
+          onClick={handleSaveTeam}
+          style={{
+            backgroundColor: "#0077b6",
+            color: "white",
+            border: "none",
+            padding: "0.75rem 2rem",
+            borderRadius: "8px",
+            fontSize: "1.1rem",
+            cursor: "pointer",
+          }}
+        >
+          Save Team
+        </button>
+      </div>
     </div>
   );
 }
 
+// Helper function for type badge colors
 function getTypeColor(type) {
   const colors = {
     fire: "#f94144",
