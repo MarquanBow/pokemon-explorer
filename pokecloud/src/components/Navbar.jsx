@@ -2,10 +2,10 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { auth } from "../firebase"; // your firebase config file
+import ProfileMenu from "./ProfileMenu"; // <-- Import the new ProfileMenu
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
-  signOut,
   onAuthStateChanged,
 } from "firebase/auth";
 
@@ -41,10 +41,6 @@ export default function Navbar() {
     }
   };
 
-  const handleLogout = async () => {
-    await signOut(auth);
-  };
-
   return (
     <nav
       style={{
@@ -70,23 +66,8 @@ export default function Navbar() {
 
       <div style={{ marginLeft: "auto", color: "white" }}>
         {user ? (
-          <div style={{ display: "flex", alignItems: "center", gap: "1rem" }}>
-            <span>Welcome, {user.email}</span>
-            <button
-              onClick={handleLogout}
-              style={{
-                backgroundColor: "white",
-                color: "#e63946",
-                border: "none",
-                borderRadius: "4px",
-                padding: "0.3rem 0.6rem",
-                cursor: "pointer",
-                fontWeight: "bold",
-              }}
-            >
-              Logout
-            </button>
-          </div>
+          // Use ProfileMenu component here and pass user
+          <ProfileMenu user={user} />
         ) : (
           <button
             onClick={() => setShowAuth(!showAuth)}
@@ -165,7 +146,13 @@ export default function Navbar() {
           >
             {isLogin ? "Login" : "Sign Up"}
           </button>
-          <p style={{ fontSize: "0.8rem", marginTop: "0.5rem", textAlign: "center" }}>
+          <p
+            style={{
+              fontSize: "0.8rem",
+              marginTop: "0.5rem",
+              textAlign: "center",
+            }}
+          >
             {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
             <button
               type="button"
@@ -183,7 +170,14 @@ export default function Navbar() {
             </button>
           </p>
           {error && (
-            <p style={{ color: "red", fontSize: "0.8rem", marginTop: "0.5rem", textAlign: "center" }}>
+            <p
+              style={{
+                color: "red",
+                fontSize: "0.8rem",
+                marginTop: "0.5rem",
+                textAlign: "center",
+              }}
+            >
               {error}
             </p>
           )}

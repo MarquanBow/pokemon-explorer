@@ -5,7 +5,7 @@ import Home from "./pages/Home";
 import PokemonDetail from "./pages/PokemonDetail";
 import TeamBuilder from "./pages/TeamBuilder"; 
 import PokemonSearch from "./pages/PokemonSearch";
-import Auth from "./components/Auth"; 
+import SavedTeams from "./pages/SavedTeams";
 
 function App() {
   return (
@@ -16,6 +16,7 @@ function App() {
         <Route path="/pokemon/:name" element={<PokemonDetail />} />
         <Route path="/team-builder" element={<TeamBuilder />}  /> 
         <Route path="/search" element={<PokemonSearch />} />
+        <Route path="/teams" element={<SavedTeams />} />
       </Routes>
       </Layout>
     </Router>

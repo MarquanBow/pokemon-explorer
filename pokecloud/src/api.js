@@ -12,3 +12,13 @@ export async function getTeams(userId) {
   const res = await axios.get(`${API_BASE}/teams/${userId}`);
   return res.data;
 }
+
+// DELETE
+export async function deleteTeam(userId, teamId) {
+  return axios.delete(`${API_BASE}/teams/${userId}/${teamId}`);
+}
+
+// PUT (edit)
+export async function updateTeam(userId, teamId, updatedFields) {
+  return axios.put(`${API_BASE}/teams/${userId}/${teamId}`, updatedFields);
+}

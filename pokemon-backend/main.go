@@ -54,6 +54,9 @@ func main() {
 	// Pokémon team endpoints
 	router.POST("/teams/save", SaveTeamHandler)
 	router.GET("/teams/:userId", GetTeamsHandler)
+	router.DELETE("/teams/:userId/:teamId", DeleteTeamHandler)
+	router.PUT("/teams/:userId/:teamId", UpdateTeamHandler)
+
 
 	// Start server
 	log.Println("🚀 Server running on http://localhost:8080")

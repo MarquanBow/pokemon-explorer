@@ -86,6 +86,56 @@ func GetTeamsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, teams)
 }
 
+// DELETE /teams/:userId/:teamId
+func DeleteTeamHandler(c *gin.Context) {
+	userId := c.Param("userId")
+	teamId := c.Param("teamId")
+
+	ctx := context.Background()
+	client, err := firestoreClient.Firestore(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Firestore init error"})
+		return
+	}
+	defer client.Close()
+
+	_, err = client.Collection("users").Doc(userId).Collection("teams").Doc(teamId).Delete(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to delete team"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Team deleted"})
+}
+
+// PUT /teams/:userId/:teamId
+func UpdateTeamHandler(c *gin.Context) {
+	userId := c.Param("userId")
+	teamId := c.Param("teamId")
+
+	var updatedData map[string]interface{}
+	if err := c.BindJSON(&updatedData); err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
+	}
+
+	ctx := context.Background()
+	client, err := firestoreClient.Firestore(ctx)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Firestore init error"})
+		return
+	}
+	defer client.Close()
+
+	_, err = client.Collection("users").Doc(userId).Collection("teams").Doc(teamId).Set(ctx, updatedData, firestore.MergeAll)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, gin.H{"error": "Failed to update team"})
+		return
+	}
+
+	c.JSON(http.StatusOK, gin.H{"message": "Team updated"})
+}
+
 func toStringSlice(v interface{}) []string {
 	var result []string
 	val, ok := v.([]interface{})
