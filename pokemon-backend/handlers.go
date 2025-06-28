@@ -5,9 +5,9 @@ import (
 	"log"
 	"net/http"
 
+	"cloud.google.com/go/firestore"
 	"github.com/gin-gonic/gin"
 )
-
 
 type Team struct {
 	UserID   string   `json:"userId"`
@@ -27,7 +27,8 @@ func SaveTeamHandler(c *gin.Context) {
 	log.Printf("📥 Incoming Team: %+v\n", team)
 
 	ctx := context.Background()
-	client, err := firestoreClient.Firestore(ctx)
+	client, err := firestore.NewClient(ctx, "pokecloud-41c4a")
+
 	if err != nil {
 		log.Println("❌ Firestore Init Error:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Firestore init error"})
@@ -53,13 +54,12 @@ func SaveTeamHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Team saved to Firestore"})
 }
 
-
 // GetTeamsHandler gets teams from Firestore
 func GetTeamsHandler(c *gin.Context) {
 	userId := c.Param("userId")
 
 	ctx := context.Background()
-	client, err := firestoreClient.Firestore(ctx)
+	client, err := firestore.NewClient(ctx, "pokecloud-41c4a")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Firestore init error"})
 		return
@@ -92,7 +92,7 @@ func DeleteTeamHandler(c *gin.Context) {
 	teamId := c.Param("teamId")
 
 	ctx := context.Background()
-	client, err := firestoreClient.Firestore(ctx)
+	client, err := firestore.NewClient(ctx, "pokecloud-41c4a")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Firestore init error"})
 		return
@@ -120,7 +120,7 @@ func UpdateTeamHandler(c *gin.Context) {
 	}
 
 	ctx := context.Background()
-	client, err := firestoreClient.Firestore(ctx)
+	client, err := firestore.NewClient(ctx, "pokecloud-41c4a")
 	if err != nil {
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Firestore init error"})
 		return
@@ -154,4 +154,3 @@ func toStringSlice(v interface{}) []string {
 	}
 	return result
 }
-
