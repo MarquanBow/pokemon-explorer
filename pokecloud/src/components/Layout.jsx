@@ -1,12 +1,11 @@
-// src/components/Layout.jsx
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 
 export default function Layout({ children }) {
   return (
-    <div style={{ display: "flex", flexDirection: "column", minHeight: "100vh" }}>
+    <div className="flex flex-col min-h-screen bg-gray-50">
       <Navbar />
-      <main style={{ flex: "1", padding: "2rem", background: "#f9f9f9" }}>
+      <main className="flex-1">
         {children}
       </main>
       <Footer />

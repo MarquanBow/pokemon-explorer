@@ -1,15 +1,17 @@
-/* src/index.css */
-body {
-  font-family: 'Segoe UI', sans-serif;
-  background-color: #f0f4f8;
-  margin: 0;
-  padding: 0;
-  color: #333;
+@import "tailwindcss";
+
+@theme {
+  --color-pokemon-red: #e63946;
+  --color-pokemon-dark: #023047;
+  --color-pokemon-blue: #0077b6;
+  --color-pokemon-teal: #2a9d8f;
+  --font-sans: 'Segoe UI', ui-sans-serif, system-ui, sans-serif;
 }
+
+body {
+  font-family: var(--font-sans);
+}
+
 a {
   text-decoration: none;
-  color: #3366cc;
-}
-a:hover {
-  text-decoration: underline;
 }

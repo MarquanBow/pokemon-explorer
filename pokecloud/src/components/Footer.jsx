@@ -1,15 +1,19 @@
-// src/components/Footer.jsx
 export default function Footer() {
   return (
-    <footer style={{
-      backgroundColor: "#222",
-      color: "#eee",
-      padding: "1rem",
-      textAlign: "center"
-    }}>
-      <p>PokéCloud © {new Date().getFullYear()} — Built with ❤️ by Marquan Bowman</p>
-      <p style={{ fontSize: "0.9rem", color: "#bbb" }}>
-        Data from <a href="https://pokeapi.co" target="_blank" rel="noreferrer" style={{ color: "#90e0ef" }}>PokéAPI</a>
+    <footer className="bg-gray-900 text-gray-300 py-6 text-center">
+      <p className="mb-1 text-sm">
+        PokéCloud © {new Date().getFullYear()} — Built with ❤️ by Marquan Bowman
+      </p>
+      <p className="text-xs text-gray-500">
+        Data from{" "}
+        <a
+          href="https://pokeapi.co"
+          target="_blank"
+          rel="noreferrer"
+          className="text-blue-400 hover:underline"
+        >
+          PokéAPI
+        </a>
       </p>
     </footer>
   );
