@@ -10,6 +10,7 @@ import (
 )
 
 type Team struct {
+	ID       string   `json:"id"`
 	UserID   string   `json:"userId"`
 	TeamName string   `json:"teamName"`
 	Pokemons []string `json:"pokemons"`
@@ -28,7 +29,6 @@ func SaveTeamHandler(c *gin.Context) {
 
 	ctx := context.Background()
 	client, err := firestore.NewClient(ctx, "pokecloud-41c4a")
-
 	if err != nil {
 		log.Println("❌ Firestore Init Error:", err)
 		c.JSON(http.StatusInternalServerError, gin.H{"error": "Firestore init error"})
@@ -77,6 +77,7 @@ func GetTeamsHandler(c *gin.Context) {
 
 		data := doc.Data()
 		teams = append(teams, Team{
+			ID:       doc.Ref.ID,
 			UserID:   userId,
 			TeamName: data["teamName"].(string),
 			Pokemons: toStringSlice(data["pokemons"]),
@@ -86,7 +87,7 @@ func GetTeamsHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, teams)
 }
 
-// DELETE /teams/:userId/:teamId
+// DeleteTeamHandler deletes a team from Firestore
 func DeleteTeamHandler(c *gin.Context) {
 	userId := c.Param("userId")
 	teamId := c.Param("teamId")
@@ -108,7 +109,7 @@ func DeleteTeamHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Team deleted"})
 }
 
-// PUT /teams/:userId/:teamId
+// UpdateTeamHandler renames or updates a team in Firestore
 func UpdateTeamHandler(c *gin.Context) {
 	userId := c.Param("userId")
 	teamId := c.Param("teamId")
@@ -143,10 +144,8 @@ func toStringSlice(v interface{}) []string {
 		log.Printf("⚠️ Unexpected type for pokemons: %T\n", v)
 		return result
 	}
-
 	for _, item := range val {
-		str, ok := item.(string)
-		if ok {
+		if str, ok := item.(string); ok {
 			result = append(result, str)
 		} else {
 			log.Printf("⚠️ Skipping non-string item in pokemons: %v\n", item)

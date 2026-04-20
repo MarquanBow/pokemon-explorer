@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { saveTeam, getTeams, deleteTeam, updateTeam } from "../api";
 import { auth } from "../firebase";
@@ -16,16 +16,25 @@ export default function TeamBuilder() {
   const [user, setUser] = useState(null);
   const [team, setTeam] = useState([]);
   const [savedTeams, setSavedTeams] = useState([]);
-  const [searchTerm, setSearchTerm] = useState("");
-  const [searchResult, setSearchResult] = useState(null);
-  const [searchError, setSearchError] = useState("");
   const [teamName, setTeamName] = useState("");
 
+  // Search state
+  const [searchTerm, setSearchTerm] = useState("");
+  const [allNames, setAllNames] = useState([]);
+  const [suggestions, setSuggestions] = useState([]);
+  const [showSuggestions, setShowSuggestions] = useState(false);
+  const [searchResult, setSearchResult] = useState(null);
+  const [searchError, setSearchError] = useState("");
+  const [searchLoading, setSearchLoading] = useState(false);
+  const searchRef = useRef(null);
+
+  // Load auth
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (currentUser) => setUser(currentUser));
     return unsubscribe;
   }, []);
 
+  // Load saved teams when user changes
   useEffect(() => {
     if (!user) { setSavedTeams([]); setTeam([]); setTeamName(""); return; }
     getTeams(user.uid)
@@ -33,17 +42,77 @@ export default function TeamBuilder() {
       .catch((err) => console.error("Failed to fetch teams:", err));
   }, [user]);
 
-  const handleSearch = async () => {
-    if (!searchTerm) return;
+  // Fetch all Pokemon names once for autocomplete
+  useEffect(() => {
+    fetch("https://pokeapi.co/api/v2/pokemon?limit=1302")
+      .then((r) => r.json())
+      .then((d) => setAllNames(d.results.map((p) => p.name)));
+  }, []);
+
+  // Filter suggestions as user types
+  useEffect(() => {
+    const term = searchTerm.trim().toLowerCase();
+    if (term.length < 2) {
+      setSuggestions([]);
+      setShowSuggestions(false);
+      return;
+    }
+    const matches = allNames
+      .filter((n) => n.includes(term))
+      .sort((a, b) => {
+        // Prioritise names that start with the term
+        const aStarts = a.startsWith(term);
+        const bStarts = b.startsWith(term);
+        if (aStarts && !bStarts) return -1;
+        if (!aStarts && bStarts) return 1;
+        return a.localeCompare(b);
+      })
+      .slice(0, 8);
+    setSuggestions(matches);
+    setShowSuggestions(matches.length > 0);
+  }, [searchTerm, allNames]);
+
+  // Close suggestions on outside click
+  useEffect(() => {
+    const handler = (e) => {
+      if (searchRef.current && !searchRef.current.contains(e.target)) {
+        setShowSuggestions(false);
+      }
+    };
+    document.addEventListener("mousedown", handler);
+    return () => document.removeEventListener("mousedown", handler);
+  }, []);
+
+  const fetchPokemon = async (name) => {
     setSearchError("");
     setSearchResult(null);
+    setSearchLoading(true);
+    setShowSuggestions(false);
     try {
-      const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${searchTerm.toLowerCase()}`);
+      const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${name.toLowerCase()}`);
       if (!res.ok) throw new Error("Pokémon not found");
       const data = await res.json();
-      setSearchResult({ name: data.name, types: data.types.map((t) => t.type.name), sprite: data.sprites.front_default });
-    } catch (error) {
-      setSearchError(error.message);
+      setSearchResult({
+        name: data.name,
+        types: data.types.map((t) => t.type.name),
+        sprite: data.sprites.front_default,
+      });
+    } catch (err) {
+      setSearchError(err.message);
+    }
+    setSearchLoading(false);
+  };
+
+  const handleSelectSuggestion = (name) => {
+    setSearchTerm(name);
+    fetchPokemon(name);
+  };
+
+  const handleSearchKeyDown = (e) => {
+    if (e.key === "Enter") {
+      fetchPokemon(searchTerm);
+    } else if (e.key === "Escape") {
+      setShowSuggestions(false);
     }
   };
 
@@ -69,7 +138,7 @@ export default function TeamBuilder() {
       setSavedTeams(res?.data ?? []);
     } catch (err) {
       console.error("Error saving team", err);
-      alert("Failed to save team.");
+      alert("Failed to save team. The server may be starting up — please try again in a moment.");
     }
   };
 
@@ -107,7 +176,7 @@ export default function TeamBuilder() {
 
         {/* Search Panel */}
         <div className="bg-white rounded-3xl shadow-md border border-gray-100 p-6 mb-8">
-          <p className="text-xs text-gray-400 uppercase font-black tracking-widest mb-3">Team Name</p>
+          <p className="text-xs text-gray-400 uppercase font-black tracking-widest mb-2">Team Name</p>
           <input
             type="text"
             placeholder="e.g. Dream Team, Champion Squad..."
@@ -115,23 +184,64 @@ export default function TeamBuilder() {
             onChange={(e) => setTeamName(e.target.value)}
             className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-pokemon-red mb-5 bg-gray-50"
           />
-          <p className="text-xs text-gray-400 uppercase font-black tracking-widest mb-3">Add Pokémon</p>
-          <div className="flex gap-3">
-            <input
-              type="text"
-              placeholder="Search by name (e.g. pikachu)..."
-              value={searchTerm}
-              onChange={(e) => setSearchTerm(e.target.value)}
-              onKeyDown={(e) => e.key === "Enter" && handleSearch()}
-              className="flex-1 px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-pokemon-red bg-gray-50"
-            />
-            <button
-              onClick={handleSearch}
-              className="px-6 py-3 bg-gradient-to-r from-pokemon-blue to-blue-500 text-white font-black rounded-xl shadow-md shadow-blue-400/30 hover:shadow-blue-400/50 hover:scale-105 transition-all duration-200 cursor-pointer text-sm"
-            >
-              Search
-            </button>
+
+          <p className="text-xs text-gray-400 uppercase font-black tracking-widest mb-2">Add Pokémon</p>
+          <div className="relative" ref={searchRef}>
+            <div className="flex gap-3">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  placeholder="Start typing a name… (e.g. pika)"
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  onKeyDown={handleSearchKeyDown}
+                  onFocus={() => suggestions.length > 0 && setShowSuggestions(true)}
+                  className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-pokemon-red bg-gray-50 pr-10"
+                />
+                {searchLoading && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <div className="w-4 h-4 border-2 border-pokemon-red border-t-transparent rounded-full animate-spin" />
+                  </div>
+                )}
+              </div>
+              <button
+                onClick={() => fetchPokemon(searchTerm)}
+                className="px-6 py-3 bg-gradient-to-r from-pokemon-blue to-blue-500 text-white font-black rounded-xl shadow-md shadow-blue-400/30 hover:shadow-blue-400/50 hover:scale-105 transition-all duration-200 cursor-pointer text-sm shrink-0"
+              >
+                Search
+              </button>
+            </div>
+
+            {/* Autocomplete dropdown */}
+            <AnimatePresence>
+              {showSuggestions && (
+                <motion.ul
+                  initial={{ opacity: 0, y: -4 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -4 }}
+                  transition={{ duration: 0.1 }}
+                  className="absolute left-0 right-14 mt-1 bg-white rounded-2xl shadow-xl border border-gray-100 overflow-hidden z-20"
+                >
+                  {suggestions.map((name) => (
+                    <li
+                      key={name}
+                      onMouseDown={() => handleSelectSuggestion(name)}
+                      className="flex items-center gap-3 px-4 py-2.5 hover:bg-red-50 cursor-pointer transition-colors"
+                    >
+                      <img
+                        src={`https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/pokemon/${name}.png`}
+                        alt={name}
+                        className="w-8 h-8"
+                        onError={(e) => { e.target.style.display = "none"; }}
+                      />
+                      <span className="text-sm font-bold text-gray-700 capitalize">{name}</span>
+                    </li>
+                  ))}
+                </motion.ul>
+              )}
+            </AnimatePresence>
           </div>
+
           {searchError && (
             <p className="text-red-500 text-sm font-semibold mt-3 bg-red-50 px-4 py-2 rounded-xl">{searchError}</p>
           )}
@@ -149,7 +259,7 @@ export default function TeamBuilder() {
               <div className="w-24 h-24 mx-auto rounded-2xl flex items-center justify-center mb-2 bg-gray-50">
                 <img src={searchResult.sprite} alt={searchResult.name} className="w-20 h-20" />
               </div>
-              <h3 className="font-black text-gray-800 text-sm mb-2">{searchResult.name.toUpperCase()}</h3>
+              <h3 className="font-black text-gray-800 text-sm mb-2 capitalize">{searchResult.name}</h3>
               <div className="flex flex-wrap justify-center gap-1 mb-4">
                 {searchResult.types.map((type) => (
                   <span key={type} className="text-white text-xs px-2.5 py-0.5 rounded-full font-bold" style={{ backgroundColor: TYPE_COLORS[type] ?? "#adb5bd" }}>
@@ -179,13 +289,9 @@ export default function TeamBuilder() {
             <div className="flex gap-4 justify-center flex-wrap">
               <AnimatePresence>
                 {team.length === 0 && (
-                  <motion.div
-                    initial={{ opacity: 0 }}
-                    animate={{ opacity: 1 }}
-                    className="text-center py-6"
-                  >
+                  <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="text-center py-6">
                     <div className="text-5xl mb-2">🎯</div>
-                    <p className="text-gray-400 font-semibold text-sm">Search for a Pokémon to add it to your team!</p>
+                    <p className="text-gray-400 font-semibold text-sm">Search for a Pokémon above to build your team!</p>
                   </motion.div>
                 )}
                 {team.map((p) => {
@@ -203,7 +309,7 @@ export default function TeamBuilder() {
                         <div className="w-20 h-20 mx-auto rounded-xl flex items-center justify-center mb-1" style={{ backgroundColor: primaryColor + "18" }}>
                           <img src={p.sprite} alt={p.name} className="w-16 h-16" />
                         </div>
-                        <h3 className="font-black text-gray-800 text-xs mb-2">{p.name.toUpperCase()}</h3>
+                        <h3 className="font-black text-gray-800 text-xs mb-2 capitalize">{p.name}</h3>
                         <div className="flex flex-wrap justify-center gap-1 mb-3">
                           {p.types.map((type) => (
                             <span key={type} className="text-white text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: TYPE_COLORS[type] ?? "#adb5bd" }}>

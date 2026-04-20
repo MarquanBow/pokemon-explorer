@@ -5,6 +5,7 @@ import ProfileMenu from "./ProfileMenu";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
+  updateProfile,
   onAuthStateChanged,
 } from "firebase/auth";
 
@@ -14,6 +15,7 @@ export default function Navbar() {
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   const location = useLocation();
 
@@ -31,14 +33,26 @@ export default function Navbar() {
       if (isLogin) {
         await signInWithEmailAndPassword(auth, email, password);
       } else {
-        await createUserWithEmailAndPassword(auth, email, password);
+        const credential = await createUserWithEmailAndPassword(auth, email, password);
+        if (username.trim()) {
+          await updateProfile(credential.user, { displayName: username.trim() });
+        }
       }
       setShowAuth(false);
       setEmail("");
       setPassword("");
+      setUsername("");
     } catch (err) {
       setError(err.message);
     }
+  };
+
+  const switchMode = () => {
+    setIsLogin((v) => !v);
+    setError("");
+    setEmail("");
+    setPassword("");
+    setUsername("");
   };
 
   const navLink = (to, label) => {
@@ -59,7 +73,6 @@ export default function Navbar() {
 
   return (
     <nav className="bg-gradient-to-r from-red-800 via-pokemon-red to-rose-500 px-6 py-3 flex items-center shadow-lg shadow-red-900/30 relative">
-      {/* Brand */}
       <Link to="/" className="flex items-center gap-2.5 mr-8">
         <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center text-lg shadow-inner">
           ⚡
@@ -67,14 +80,12 @@ export default function Navbar() {
         <span className="text-white font-black text-xl tracking-tight">PokéCloud</span>
       </Link>
 
-      {/* Nav Links */}
       <div className="flex gap-1 flex-1">
         {navLink("/", "🏠 Home")}
         {navLink("/team-builder", "🛠️ Team Builder")}
         {navLink("/search", "🔍 Explore")}
       </div>
 
-      {/* Auth */}
       <div className="ml-auto">
         {user ? (
           <ProfileMenu user={user} />
@@ -88,7 +99,6 @@ export default function Navbar() {
         )}
       </div>
 
-      {/* Auth Dropdown */}
       {showAuth && !user && (
         <div className="absolute top-full right-4 mt-2 z-50">
           <form
@@ -104,6 +114,17 @@ export default function Navbar() {
                 {isLogin ? "Sign in to your account" : "Create a free account"}
               </p>
             </div>
+
+            {!isLogin && (
+              <input
+                type="text"
+                placeholder="Trainer name"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                className="block w-full border border-gray-200 rounded-xl px-4 py-2.5 mb-3 focus:outline-none focus:ring-2 focus:ring-pokemon-red text-sm bg-gray-50"
+              />
+            )}
+
             <input
               type="email"
               placeholder="Email address"
@@ -130,7 +151,7 @@ export default function Navbar() {
               {isLogin ? "Don't have an account?" : "Already have an account?"}{" "}
               <button
                 type="button"
-                onClick={() => setIsLogin(!isLogin)}
+                onClick={switchMode}
                 className="text-pokemon-red font-black hover:underline cursor-pointer"
               >
                 {isLogin ? "Sign Up" : "Login"}
