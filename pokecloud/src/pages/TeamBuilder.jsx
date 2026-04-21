@@ -1,8 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { saveTeam, getTeams, deleteTeam, updateTeam } from "../api";
-import { auth } from "../firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { useAuth } from "../context/AuthContext";
 
 const TYPE_COLORS = {
   fire: "#f94144", water: "#277da1", grass: "#43aa8b", electric: "#f9c74f",
@@ -13,7 +12,7 @@ const TYPE_COLORS = {
 };
 
 export default function TeamBuilder() {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [team, setTeam] = useState([]);
   const [savedTeams, setSavedTeams] = useState([]);
   const [teamName, setTeamName] = useState("");
@@ -27,12 +26,6 @@ export default function TeamBuilder() {
   const [searchError, setSearchError] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
   const searchRef = useRef(null);
-
-  // Load auth
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => setUser(currentUser));
-    return unsubscribe;
-  }, []);
 
   // Load saved teams when user changes
   useEffect(() => {

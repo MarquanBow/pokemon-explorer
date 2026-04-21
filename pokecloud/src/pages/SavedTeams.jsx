@@ -1,38 +1,33 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
 import { getTeams, deleteTeam, updateTeam } from "../api";
-import { auth } from "../firebase";
-import { onAuthStateChanged } from "firebase/auth";
+import { useAuth } from "../context/AuthContext";
 
 export default function SavedTeams() {
-  const [user, setUser] = useState(null);
+  const { user } = useAuth();
   const [savedTeams, setSavedTeams] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, async (currentUser) => {
-      setUser(currentUser);
-      if (currentUser) {
-        const res = await getTeams(currentUser.uid);
-        setSavedTeams(res.data);
-      }
-      setLoading(false);
-    });
-    return unsubscribe;
-  }, []);
+    if (user === undefined) return; // still loading auth
+    if (!user) { setLoading(false); return; }
+    getTeams(user.uid)
+      .then((res) => setSavedTeams(res.data ?? []))
+      .finally(() => setLoading(false));
+  }, [user]);
 
   const handleDelete = async (teamId) => {
     if (!user || !window.confirm("Delete this team?")) return;
     await deleteTeam(user.uid, teamId);
     const res = await getTeams(user.uid);
-    setSavedTeams(res.data);
+    setSavedTeams(res.data ?? []);
   };
 
   const handleRename = async (teamId, newName) => {
     if (!user) return;
     await updateTeam(user.uid, teamId, { teamName: newName });
     const res = await getTeams(user.uid);
-    setSavedTeams(res.data);
+    setSavedTeams(res.data ?? []);
   };
 
   return (

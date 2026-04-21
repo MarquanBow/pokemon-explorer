@@ -1,16 +1,16 @@
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { auth } from "../firebase";
+import { useAuth } from "../context/AuthContext";
 import ProfileMenu from "./ProfileMenu";
 import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   updateProfile,
-  onAuthStateChanged,
 } from "firebase/auth";
 
 export default function Navbar() {
-  const [user, setUser] = useState(null);
+  const { user, refreshUser } = useAuth();
   const [showAuth, setShowAuth] = useState(false);
   const [isLogin, setIsLogin] = useState(true);
   const [email, setEmail] = useState("");
@@ -18,13 +18,6 @@ export default function Navbar() {
   const [username, setUsername] = useState("");
   const [error, setError] = useState("");
   const location = useLocation();
-
-  useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (currentUser) => {
-      setUser(currentUser);
-    });
-    return unsubscribe;
-  }, []);
 
   const handleSubmit = async (e) => {
     e.preventDefault();
@@ -36,6 +29,7 @@ export default function Navbar() {
         const credential = await createUserWithEmailAndPassword(auth, email, password);
         if (username.trim()) {
           await updateProfile(credential.user, { displayName: username.trim() });
+          refreshUser();
         }
       }
       setShowAuth(false);
