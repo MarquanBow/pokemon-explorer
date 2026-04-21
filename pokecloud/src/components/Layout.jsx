@@ -1,3 +1,4 @@
+import { Toaster } from "sonner";
 import Navbar from "./Navbar";
 import Footer from "./Footer";
 
@@ -9,6 +10,19 @@ export default function Layout({ children }) {
         {children}
       </main>
       <Footer />
+      <Toaster
+        position="bottom-right"
+        toastOptions={{
+          style: {
+            fontFamily: "Nunito, sans-serif",
+            fontWeight: 700,
+            borderRadius: "16px",
+          },
+          classNames: {
+            toast: "shadow-xl",
+          },
+        }}
+      />
     </div>
   );
 }

@@ -1,5 +1,6 @@
 import { useState, useEffect, useCallback } from "react";
 import { Link } from "react-router-dom";
+import { toast } from "sonner";
 import { getTeams, deleteTeam, updateTeam } from "../api";
 import { useAuth } from "../context/AuthContext";
 
@@ -33,10 +34,23 @@ export default function SavedTeams() {
     loadTeams(user.uid);
   }, [user, loadTeams]);
 
-  const handleDelete = async (teamId) => {
-    if (!user || !window.confirm("Delete this team?")) return;
-    await deleteTeam(user.uid, teamId);
-    loadTeams(user.uid);
+  const handleDelete = (teamId) => {
+    if (!user) return;
+    toast("Delete this team?", {
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          try {
+            await deleteTeam(user.uid, teamId);
+            loadTeams(user.uid);
+            toast.success("Team deleted.");
+          } catch {
+            toast.error("Could not delete team.");
+          }
+        },
+      },
+      cancel: { label: "Cancel" },
+    });
   };
 
   const handleRename = async (teamId, newName) => {

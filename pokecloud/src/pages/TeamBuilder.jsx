@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
+import { toast } from "sonner";
 import { saveTeam, getTeams, deleteTeam, updateTeam } from "../api";
 import { useAuth } from "../context/AuthContext";
 
@@ -110,8 +111,8 @@ export default function TeamBuilder() {
   };
 
   const addToTeam = (pokemon) => {
-    if (team.length >= 6) return alert("Team is full! Max 6 Pokémon.");
-    if (team.find((p) => p.name === pokemon.name)) return alert("Already in team!");
+    if (team.length >= 6) { toast.error("Team is full! Max 6 Pokémon."); return; }
+    if (team.find((p) => p.name === pokemon.name)) { toast.warning("Already in your team!"); return; }
     setTeam([...team, pokemon]);
     setSearchResult(null);
     setSearchTerm("");
@@ -120,28 +121,41 @@ export default function TeamBuilder() {
   const removeFromTeam = (name) => setTeam(team.filter((p) => p.name !== name));
 
   const handleSaveTeam = async () => {
-    if (!user) return alert("Please log in to save your team.");
-    if (!teamName) return alert("Enter a team name.");
-    if (team.length === 0) return alert("Add at least one Pokémon to your team.");
+    if (!user) { toast.error("Please log in to save your team."); return; }
+    if (!teamName) { toast.error("Give your team a name first."); return; }
+    if (team.length === 0) { toast.error("Add at least one Pokémon to your team."); return; }
+    const saving = toast.loading("Saving your team...");
     try {
       await saveTeam({ userId: user.uid, teamName, pokemons: team.map((p) => p.name) });
-      alert("Team saved!");
+      toast.success("Team saved!", { id: saving });
       setTeamName(""); setTeam([]);
       const res = await getTeams(user.uid);
       setSavedTeams(res?.data ?? []);
     } catch (err) {
       console.error("Error saving team", err);
-      alert("Failed to save team. The server may be starting up — please try again in a moment.");
+      toast.error("Failed to save. The server may be starting up — try again.", { id: saving });
     }
   };
 
   const handleDelete = async (teamId) => {
-    if (!user || !window.confirm("Delete this team?")) return;
-    try {
-      await deleteTeam(user.uid, teamId);
-      const res = await getTeams(user.uid);
-      setSavedTeams(res?.data ?? []);
-    } catch (err) { console.error("Failed to delete team", err); }
+    if (!user) return;
+    toast("Delete this team?", {
+      action: {
+        label: "Delete",
+        onClick: async () => {
+          try {
+            await deleteTeam(user.uid, teamId);
+            const res = await getTeams(user.uid);
+            setSavedTeams(res?.data ?? []);
+            toast.success("Team deleted.");
+          } catch (err) {
+            console.error("Failed to delete team", err);
+            toast.error("Could not delete team.");
+          }
+        },
+      },
+      cancel: { label: "Cancel" },
+    });
   };
 
   const handleRename = async (teamId, newName) => {
