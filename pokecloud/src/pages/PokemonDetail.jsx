@@ -9,6 +9,16 @@ const TYPE_COLORS = {
   ground: "#d4a373", normal: "#adb5bd",
 };
 
+const STAT_LABELS = {
+  hp: "HP", attack: "Atk", defense: "Def",
+  "special-attack": "SpA", "special-defense": "SpD", speed: "Spe",
+};
+
+const STAT_COLORS = {
+  hp: "#ff5959", attack: "#f5ac78", defense: "#fae078",
+  "special-attack": "#9db7f5", "special-defense": "#a7db8d", speed: "#fa92b2",
+};
+
 export default function PokemonDetail() {
   const { name } = useParams();
   const [details, setDetails] = useState(null);
@@ -35,6 +45,7 @@ export default function PokemonDetail() {
 
   const primaryType = details.types[0]?.type.name;
   const primaryColor = TYPE_COLORS[primaryType] ?? "#adb5bd";
+  const bst = details.stats.reduce((sum, s) => sum + s.base_stat, 0);
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-rose-50 px-6 py-12">
@@ -88,6 +99,33 @@ export default function PokemonDetail() {
                 <p className="text-gray-800 font-black text-xl">{details.weight / 10}
                   <span className="text-sm font-semibold text-gray-400 ml-1">kg</span>
                 </p>
+              </div>
+            </div>
+
+            {/* Base Stats */}
+            <div className="mb-5">
+              <div className="flex items-center justify-between mb-3">
+                <p className="text-xs text-gray-400 uppercase font-bold tracking-wider">Base Stats</p>
+                <span className="text-xs font-black text-gray-500 bg-gray-100 px-2 py-0.5 rounded-lg">BST {bst}</span>
+              </div>
+              <div className="space-y-2">
+                {details.stats.map((s) => (
+                  <div key={s.stat.name} className="flex items-center gap-3">
+                    <span className="text-xs font-bold text-gray-400 w-8 text-right shrink-0">
+                      {STAT_LABELS[s.stat.name] ?? s.stat.name}
+                    </span>
+                    <span className="text-xs font-black text-gray-700 w-7 shrink-0">{s.base_stat}</span>
+                    <div className="flex-1 bg-gray-100 rounded-full h-2.5 overflow-hidden">
+                      <div
+                        className="h-2.5 rounded-full"
+                        style={{
+                          width: `${Math.min(100, (s.base_stat / 255) * 100)}%`,
+                          backgroundColor: STAT_COLORS[s.stat.name] ?? "#adb5bd",
+                        }}
+                      />
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 

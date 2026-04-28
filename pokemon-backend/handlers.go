@@ -10,11 +10,21 @@ import (
 	"google.golang.org/api/iterator"
 )
 
+type MoveEntry struct {
+	Name string `json:"name"`
+	Type string `json:"type"`
+}
+
+type PokemonEntry struct {
+	Name  string      `json:"name"`
+	Moves []MoveEntry `json:"moves"`
+}
+
 type Team struct {
-	ID       string   `json:"id"`
-	UserID   string   `json:"userId"`
-	TeamName string   `json:"teamName"`
-	Pokemons []string `json:"pokemons"`
+	ID       string         `json:"id"`
+	UserID   string         `json:"userId"`
+	TeamName string         `json:"teamName"`
+	Pokemons []PokemonEntry `json:"pokemons"`
 }
 
 func SaveTeamHandler(c *gin.Context) {
@@ -27,12 +37,27 @@ func SaveTeamHandler(c *gin.Context) {
 
 	log.Printf("📥 Saving team: %+v\n", team)
 
+	pokemonMaps := make([]map[string]interface{}, len(team.Pokemons))
+	for i, p := range team.Pokemons {
+		moveMaps := make([]map[string]interface{}, len(p.Moves))
+		for j, m := range p.Moves {
+			moveMaps[j] = map[string]interface{}{
+				"name": m.Name,
+				"type": m.Type,
+			}
+		}
+		pokemonMaps[i] = map[string]interface{}{
+			"name":  p.Name,
+			"moves": moveMaps,
+		}
+	}
+
 	_, _, err := db.Collection("users").
 		Doc(team.UserID).
 		Collection("teams").
 		Add(context.Background(), map[string]interface{}{
 			"teamName": team.TeamName,
-			"pokemons": team.Pokemons,
+			"pokemons": pokemonMaps,
 		})
 	if err != nil {
 		log.Println("❌ Firestore write error:", err)
@@ -67,11 +92,10 @@ func GetTeamsHandler(c *gin.Context) {
 			ID:       doc.Ref.ID,
 			UserID:   userId,
 			TeamName: getString(data, "teamName"),
-			Pokemons: toStringSlice(data["pokemons"]),
+			Pokemons: toPokemonSlice(data["pokemons"]),
 		})
 	}
 
-	// Return [] instead of null when there are no teams
 	if teams == nil {
 		teams = []Team{}
 	}
@@ -114,8 +138,6 @@ func UpdateTeamHandler(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "Team updated"})
 }
 
-// getString safely reads a string field from a Firestore document map.
-// A missing or non-string field returns "" instead of panicking.
 func getString(data map[string]interface{}, key string) string {
 	val, ok := data[key]
 	if !ok || val == nil {
@@ -128,8 +150,10 @@ func getString(data map[string]interface{}, key string) string {
 	return str
 }
 
-func toStringSlice(v interface{}) []string {
-	result := []string{}
+// toPokemonSlice handles both the old format (array of strings) and the new
+// format (array of {name, moves} objects) so existing saved teams still load.
+func toPokemonSlice(v interface{}) []PokemonEntry {
+	result := []PokemonEntry{}
 	if v == nil {
 		return result
 	}
@@ -139,8 +163,34 @@ func toStringSlice(v interface{}) []string {
 		return result
 	}
 	for _, item := range items {
-		if str, ok := item.(string); ok {
-			result = append(result, str)
+		switch val := item.(type) {
+		case string:
+			result = append(result, PokemonEntry{Name: val, Moves: []MoveEntry{}})
+		case map[string]interface{}:
+			result = append(result, PokemonEntry{
+				Name:  getString(val, "name"),
+				Moves: toMoveSlice(val["moves"]),
+			})
+		}
+	}
+	return result
+}
+
+func toMoveSlice(v interface{}) []MoveEntry {
+	result := []MoveEntry{}
+	if v == nil {
+		return result
+	}
+	items, ok := v.([]interface{})
+	if !ok {
+		return result
+	}
+	for _, item := range items {
+		if m, ok := item.(map[string]interface{}); ok {
+			result = append(result, MoveEntry{
+				Name: getString(m, "name"),
+				Type: getString(m, "type"),
+			})
 		}
 	}
 	return result

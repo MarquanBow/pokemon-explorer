@@ -12,13 +12,166 @@ const TYPE_COLORS = {
   ground: "#d4a373", normal: "#adb5bd",
 };
 
+const ALL_TYPES = [
+  "normal","fire","water","electric","grass","ice","fighting","poison",
+  "ground","flying","psychic","bug","rock","ghost","dragon","dark","steel","fairy",
+];
+
+const STAT_LABELS = {
+  hp: "HP", attack: "Atk", defense: "Def",
+  "special-attack": "SpA", "special-defense": "SpD", speed: "Spe",
+};
+
+const STAT_COLORS = {
+  hp: "#ff5959", attack: "#f5ac78", defense: "#fae078",
+  "special-attack": "#9db7f5", "special-defense": "#a7db8d", speed: "#fa92b2",
+};
+
+// Offensive effectiveness: OFFENSE[attackType][defenseType] = multiplier (omitted = 1)
+const OFFENSE = {
+  normal:   { rock: 0.5, ghost: 0, steel: 0.5 },
+  fire:     { fire: 0.5, water: 0.5, grass: 2, ice: 2, bug: 2, rock: 0.5, dragon: 0.5, steel: 2 },
+  water:    { fire: 2, water: 0.5, grass: 0.5, ground: 2, rock: 2, dragon: 0.5 },
+  electric: { water: 2, electric: 0.5, grass: 0.5, ground: 0, flying: 2, dragon: 0.5 },
+  grass:    { fire: 0.5, water: 2, grass: 0.5, poison: 0.5, ground: 2, flying: 0.5, bug: 0.5, rock: 2, dragon: 0.5, steel: 0.5 },
+  ice:      { water: 0.5, grass: 2, ice: 0.5, ground: 2, flying: 2, dragon: 2, steel: 0.5 },
+  fighting: { normal: 2, ice: 2, poison: 0.5, flying: 0.5, psychic: 0.5, bug: 0.5, rock: 2, ghost: 0, dark: 2, steel: 2, fairy: 0.5 },
+  poison:   { grass: 2, poison: 0.5, ground: 0.5, rock: 0.5, ghost: 0.5, steel: 0, fairy: 2 },
+  ground:   { fire: 2, electric: 2, grass: 0.5, poison: 2, flying: 0, bug: 0.5, rock: 2, steel: 2 },
+  flying:   { electric: 0.5, grass: 2, fighting: 2, bug: 2, rock: 0.5, steel: 0.5 },
+  psychic:  { fighting: 2, poison: 2, psychic: 0.5, dark: 0, steel: 0.5 },
+  bug:      { fire: 0.5, grass: 2, fighting: 0.5, flying: 0.5, psychic: 2, ghost: 0.5, dark: 2, steel: 0.5, fairy: 0.5 },
+  rock:     { fire: 2, ice: 2, fighting: 0.5, ground: 0.5, flying: 2, bug: 2, steel: 0.5 },
+  ghost:    { normal: 0, psychic: 2, ghost: 2, dark: 0.5 },
+  dragon:   { dragon: 2, steel: 0.5, fairy: 0 },
+  dark:     { fighting: 0.5, psychic: 2, ghost: 2, dark: 0.5, fairy: 0.5 },
+  steel:    { fire: 0.5, water: 0.5, electric: 0.5, ice: 2, rock: 2, steel: 0.5, fairy: 2 },
+  fairy:    { fire: 0.5, fighting: 2, poison: 0.5, dragon: 2, dark: 2, steel: 0.5 },
+};
+
+function getMult(attackType, defTypes) {
+  return defTypes.reduce((mult, dt) => mult * (OFFENSE[attackType]?.[dt] ?? 1), 1);
+}
+
+// Returns set of defending types that are covered (≥2x) by any of the given attacking types
+function getOffensiveCoverage(attackTypes) {
+  const covered = new Set();
+  for (const at of attackTypes) {
+    for (const dt of ALL_TYPES) {
+      if ((OFFENSE[at]?.[dt] ?? 1) >= 2) covered.add(dt);
+    }
+  }
+  return covered;
+}
+
+// For each attacking type, counts how many team Pokemon take ≥2x from it
+function getDefensiveWeaknesses(team) {
+  const weakTo = {};
+  for (const at of ALL_TYPES) {
+    weakTo[at] = team.filter((p) => getMult(at, p.types) >= 2).length;
+  }
+  return weakTo;
+}
+
+function TypeBadge({ type }) {
+  return (
+    <span
+      className="text-white text-xs px-2.5 py-0.5 rounded-full font-bold capitalize"
+      style={{ backgroundColor: TYPE_COLORS[type] ?? "#adb5bd" }}
+    >
+      {type}
+    </span>
+  );
+}
+
+function MiniStatBar({ stat }) {
+  return (
+    <div className="flex items-center gap-1.5">
+      <span className="text-xs font-bold text-gray-400 w-7 text-right shrink-0">
+        {STAT_LABELS[stat.stat.name] ?? stat.stat.name}
+      </span>
+      <div className="flex-1 bg-gray-100 rounded-full h-1.5 overflow-hidden">
+        <div
+          className="h-1.5 rounded-full"
+          style={{
+            width: `${Math.min(100, (stat.base_stat / 255) * 100)}%`,
+            backgroundColor: STAT_COLORS[stat.stat.name] ?? "#adb5bd",
+          }}
+        />
+      </div>
+      <span className="text-xs font-black text-gray-600 w-6 shrink-0">{stat.base_stat}</span>
+    </div>
+  );
+}
+
+function TypeCoveragePanel({ team }) {
+  // Offensive: use selected move types; fall back to Pokemon types if no moves chosen
+  const attackTypes = [...new Set(
+    team.flatMap((p) =>
+      p.moves.length > 0 ? p.moves.map((m) => m.type) : p.types
+    )
+  )];
+  const covered = getOffensiveCoverage(attackTypes);
+  const weakTo = getDefensiveWeaknesses(team);
+
+  return (
+    <div className="space-y-5">
+      <div>
+        <p className="text-xs text-gray-400 uppercase font-black tracking-widest mb-3">
+          Offensive Coverage
+          <span className="text-gray-300 font-semibold ml-1 normal-case">
+            ({covered.size}/18 types covered)
+          </span>
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {ALL_TYPES.map((t) => (
+            <span
+              key={t}
+              className="text-xs font-bold px-2.5 py-1 rounded-lg capitalize transition-opacity"
+              style={{
+                backgroundColor: covered.has(t) ? (TYPE_COLORS[t] ?? "#adb5bd") : "#f1f5f9",
+                color: covered.has(t) ? "white" : "#94a3b8",
+              }}
+            >
+              {t}
+            </span>
+          ))}
+        </div>
+      </div>
+
+      <div>
+        <p className="text-xs text-gray-400 uppercase font-black tracking-widest mb-3">
+          Team Weaknesses
+        </p>
+        <div className="flex flex-wrap gap-1.5">
+          {ALL_TYPES.map((t) => {
+            const count = weakTo[t];
+            if (count === 0) return null;
+            return (
+              <span
+                key={t}
+                className="text-xs font-bold px-2.5 py-1 rounded-lg capitalize text-white"
+                style={{ backgroundColor: TYPE_COLORS[t] ?? "#adb5bd", opacity: count >= 2 ? 1 : 0.6 }}
+              >
+                {t} ×{count}
+              </span>
+            );
+          })}
+        </div>
+        {ALL_TYPES.every((t) => weakTo[t] === 0) && (
+          <p className="text-gray-400 text-sm font-semibold">No weaknesses! 🏆</p>
+        )}
+      </div>
+    </div>
+  );
+}
+
 export default function TeamBuilder() {
   const { user } = useAuth();
   const [team, setTeam] = useState([]);
   const [savedTeams, setSavedTeams] = useState([]);
   const [teamName, setTeamName] = useState("");
 
-  // Search state
   const [searchTerm, setSearchTerm] = useState("");
   const [allNames, setAllNames] = useState([]);
   const [suggestions, setSuggestions] = useState([]);
@@ -26,9 +179,10 @@ export default function TeamBuilder() {
   const [searchResult, setSearchResult] = useState(null);
   const [searchError, setSearchError] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
+  const [moveTypeCache, setMoveTypeCache] = useState({});
+  const [loadingMove, setLoadingMove] = useState(null);
   const searchRef = useRef(null);
 
-  // Load saved teams when user changes
   useEffect(() => {
     if (!user) { setSavedTeams([]); setTeam([]); setTeamName(""); return; }
     getTeams(user.uid)
@@ -36,27 +190,19 @@ export default function TeamBuilder() {
       .catch((err) => console.error("Failed to fetch teams:", err));
   }, [user]);
 
-  // Fetch all Pokemon names once for autocomplete
   useEffect(() => {
     fetch("https://pokeapi.co/api/v2/pokemon?limit=1302")
       .then((r) => r.json())
       .then((d) => setAllNames(d.results.map((p) => p.name)));
   }, []);
 
-  // Filter suggestions as user types
   useEffect(() => {
     const term = searchTerm.trim().toLowerCase();
-    if (term.length < 2) {
-      setSuggestions([]);
-      setShowSuggestions(false);
-      return;
-    }
+    if (term.length < 2) { setSuggestions([]); setShowSuggestions(false); return; }
     const matches = allNames
       .filter((n) => n.includes(term))
       .sort((a, b) => {
-        // Prioritise names that start with the term
-        const aStarts = a.startsWith(term);
-        const bStarts = b.startsWith(term);
+        const aStarts = a.startsWith(term), bStarts = b.startsWith(term);
         if (aStarts && !bStarts) return -1;
         if (!aStarts && bStarts) return 1;
         return a.localeCompare(b);
@@ -66,12 +212,9 @@ export default function TeamBuilder() {
     setShowSuggestions(matches.length > 0);
   }, [searchTerm, allNames]);
 
-  // Close suggestions on outside click
   useEffect(() => {
     const handler = (e) => {
-      if (searchRef.current && !searchRef.current.contains(e.target)) {
-        setShowSuggestions(false);
-      }
+      if (searchRef.current && !searchRef.current.contains(e.target)) setShowSuggestions(false);
     };
     document.addEventListener("mousedown", handler);
     return () => document.removeEventListener("mousedown", handler);
@@ -86,10 +229,20 @@ export default function TeamBuilder() {
       const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${name.toLowerCase()}`);
       if (!res.ok) throw new Error("Pokémon not found");
       const data = await res.json();
+      const levelUpMoves = [
+        ...new Set(
+          data.moves
+            .filter((m) => m.version_group_details.some((v) => v.move_learn_method.name === "level-up"))
+            .map((m) => m.move.name)
+        ),
+      ].sort();
       setSearchResult({
         name: data.name,
         types: data.types.map((t) => t.type.name),
         sprite: data.sprites.front_default,
+        stats: data.stats,
+        availableMoves: levelUpMoves,
+        selectedMoves: [],
       });
     } catch (err) {
       setSearchError(err.message);
@@ -97,23 +250,53 @@ export default function TeamBuilder() {
     setSearchLoading(false);
   };
 
-  const handleSelectSuggestion = (name) => {
-    setSearchTerm(name);
-    fetchPokemon(name);
+  const handleSelectSuggestion = (name) => { setSearchTerm(name); fetchPokemon(name); };
+  const handleSearchKeyDown = (e) => {
+    if (e.key === "Enter") fetchPokemon(searchTerm);
+    else if (e.key === "Escape") setShowSuggestions(false);
   };
 
-  const handleSearchKeyDown = (e) => {
-    if (e.key === "Enter") {
-      fetchPokemon(searchTerm);
-    } else if (e.key === "Escape") {
-      setShowSuggestions(false);
+  const handleToggleMove = async (moveName) => {
+    const isSelected = searchResult.selectedMoves.find((m) => m.name === moveName);
+    if (isSelected) {
+      setSearchResult((prev) => ({
+        ...prev,
+        selectedMoves: prev.selectedMoves.filter((m) => m.name !== moveName),
+      }));
+      return;
     }
+    if (searchResult.selectedMoves.length >= 4) return;
+
+    let moveType = moveTypeCache[moveName];
+    if (!moveType) {
+      setLoadingMove(moveName);
+      try {
+        const res = await fetch(`https://pokeapi.co/api/v2/move/${moveName}`);
+        const data = await res.json();
+        moveType = data.type.name;
+        setMoveTypeCache((prev) => ({ ...prev, [moveName]: moveType }));
+      } catch {
+        moveType = "normal";
+      }
+      setLoadingMove(null);
+    }
+
+    setSearchResult((prev) => ({
+      ...prev,
+      selectedMoves: [...prev.selectedMoves, { name: moveName, type: moveType }],
+    }));
   };
 
   const addToTeam = (pokemon) => {
     if (team.length >= 6) { toast.error("Team is full! Max 6 Pokémon."); return; }
     if (team.find((p) => p.name === pokemon.name)) { toast.warning("Already in your team!"); return; }
-    setTeam([...team, pokemon]);
+    setTeam([...team, {
+      name: pokemon.name,
+      types: pokemon.types,
+      sprite: pokemon.sprite,
+      stats: pokemon.stats,
+      moves: pokemon.selectedMoves,
+    }]);
     setSearchResult(null);
     setSearchTerm("");
   };
@@ -126,7 +309,11 @@ export default function TeamBuilder() {
     if (team.length === 0) { toast.error("Add at least one Pokémon to your team."); return; }
     const saving = toast.loading("Saving your team...");
     try {
-      await saveTeam({ userId: user.uid, teamName, pokemons: team.map((p) => p.name) });
+      await saveTeam({
+        userId: user.uid,
+        teamName,
+        pokemons: team.map((p) => ({ name: p.name, moves: p.moves })),
+      });
       toast.success("Team saved!", { id: saving });
       setTeamName(""); setTeam([]);
       const res = await getTeams(user.uid);
@@ -219,7 +406,6 @@ export default function TeamBuilder() {
               </button>
             </div>
 
-            {/* Autocomplete dropdown */}
             <AnimatePresence>
               {showSuggestions && (
                 <motion.ul
@@ -254,34 +440,109 @@ export default function TeamBuilder() {
           )}
         </div>
 
-        {/* Search Result */}
+        {/* Search Result — expanded card with stats + move picker */}
         {searchResult && (
-          <div className="flex justify-center mb-8">
-            <motion.div
-              initial={{ opacity: 0, scale: 0.9 }}
-              animate={{ opacity: 1, scale: 1 }}
-              className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 w-52 text-center overflow-hidden relative"
-            >
-              <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-rose-400" />
-              <div className="w-24 h-24 mx-auto rounded-2xl flex items-center justify-center mb-2 bg-gray-50">
-                <img src={searchResult.sprite} alt={searchResult.name} className="w-20 h-20" />
+          <motion.div
+            initial={{ opacity: 0, scale: 0.97 }}
+            animate={{ opacity: 1, scale: 1 }}
+            className="bg-white rounded-3xl shadow-lg border border-gray-100 p-6 mb-8 overflow-hidden relative"
+          >
+            <div className="absolute top-0 left-0 right-0 h-1 bg-gradient-to-r from-red-500 to-rose-400" />
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Left: sprite, types, stats */}
+              <div>
+                <div className="flex items-center gap-4 mb-4">
+                  <img src={searchResult.sprite} alt={searchResult.name} className="w-20 h-20" />
+                  <div>
+                    <h3 className="font-black text-gray-800 text-xl capitalize mb-1">{searchResult.name}</h3>
+                    <div className="flex flex-wrap gap-1">
+                      {searchResult.types.map((t) => <TypeBadge key={t} type={t} />)}
+                    </div>
+                  </div>
+                </div>
+
+                <p className="text-xs text-gray-400 uppercase font-black tracking-widest mb-2">Base Stats</p>
+                <div className="space-y-1.5">
+                  {searchResult.stats.map((s) => <MiniStatBar key={s.stat.name} stat={s} />)}
+                </div>
               </div>
-              <h3 className="font-black text-gray-800 text-sm mb-2 capitalize">{searchResult.name}</h3>
-              <div className="flex flex-wrap justify-center gap-1 mb-4">
-                {searchResult.types.map((type) => (
-                  <span key={type} className="text-white text-xs px-2.5 py-0.5 rounded-full font-bold" style={{ backgroundColor: TYPE_COLORS[type] ?? "#adb5bd" }}>
-                    {type}
+
+              {/* Right: move picker */}
+              <div>
+                <p className="text-xs text-gray-400 uppercase font-black tracking-widest mb-2">
+                  Select Moves
+                  <span className="text-gray-300 font-semibold ml-1 normal-case">
+                    ({searchResult.selectedMoves.length}/4)
                   </span>
-                ))}
+                </p>
+
+                {/* Selected moves */}
+                {searchResult.selectedMoves.length > 0 && (
+                  <div className="flex flex-wrap gap-1.5 mb-3">
+                    {searchResult.selectedMoves.map((m) => (
+                      <button
+                        key={m.name}
+                        onClick={() => handleToggleMove(m.name)}
+                        className="flex items-center gap-1.5 text-xs font-bold text-white px-3 py-1 rounded-lg capitalize"
+                        style={{ backgroundColor: TYPE_COLORS[m.type] ?? "#adb5bd" }}
+                      >
+                        {m.name.replace(/-/g, " ")}
+                        <span className="opacity-70">✕</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+
+                {/* Move list */}
+                <div className="h-44 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50">
+                  {searchResult.availableMoves.map((moveName) => {
+                    const isSelected = searchResult.selectedMoves.find((m) => m.name === moveName);
+                    const isLoading = loadingMove === moveName;
+                    const isDisabled = !isSelected && searchResult.selectedMoves.length >= 4;
+                    const cachedType = moveTypeCache[moveName];
+                    return (
+                      <button
+                        key={moveName}
+                        onClick={() => handleToggleMove(moveName)}
+                        disabled={isDisabled || isLoading}
+                        className={`w-full text-left px-3 py-2 text-sm font-semibold capitalize flex items-center justify-between transition-colors ${
+                          isSelected
+                            ? "bg-red-50 text-pokemon-red"
+                            : isDisabled
+                            ? "text-gray-300 cursor-not-allowed"
+                            : "hover:bg-red-50 text-gray-700 cursor-pointer"
+                        }`}
+                      >
+                        <span>{moveName.replace(/-/g, " ")}</span>
+                        {isLoading && (
+                          <div className="w-3 h-3 border-2 border-pokemon-red border-t-transparent rounded-full animate-spin" />
+                        )}
+                        {!isLoading && cachedType && !isSelected && (
+                          <span
+                            className="text-xs text-white px-2 py-0.5 rounded-full font-bold"
+                            style={{ backgroundColor: TYPE_COLORS[cachedType] ?? "#adb5bd" }}
+                          >
+                            {cachedType}
+                          </span>
+                        )}
+                      </button>
+                    );
+                  })}
+                </div>
+                <p className="text-xs text-gray-400 mt-1.5">Click a move to select it — type loads on first click.</p>
               </div>
+            </div>
+
+            <div className="mt-5 flex justify-end">
               <button
                 onClick={() => addToTeam(searchResult)}
-                className="w-full bg-gradient-to-r from-pokemon-teal to-teal-500 text-white font-black py-2 rounded-xl shadow-md hover:scale-105 transition-all cursor-pointer text-sm"
+                className="px-8 py-3 bg-gradient-to-r from-pokemon-teal to-teal-500 text-white font-black rounded-xl shadow-md hover:scale-105 transition-all cursor-pointer text-sm"
               >
                 + Add to Team
               </button>
-            </motion.div>
-          </div>
+            </div>
+          </motion.div>
         )}
 
         {/* Current Team */}
@@ -309,21 +570,44 @@ export default function TeamBuilder() {
                       initial={{ opacity: 0, scale: 0.8 }}
                       animate={{ opacity: 1, scale: 1 }}
                       exit={{ opacity: 0, scale: 0.8 }}
-                      className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden w-40 text-center"
+                      className="bg-white rounded-2xl shadow-md border border-gray-100 overflow-hidden w-44"
                     >
                       <div className="h-1.5 w-full" style={{ backgroundColor: primaryColor }} />
-                      <div className="p-4">
+                      <div className="p-3">
                         <div className="w-20 h-20 mx-auto rounded-xl flex items-center justify-center mb-1" style={{ backgroundColor: primaryColor + "18" }}>
                           <img src={p.sprite} alt={p.name} className="w-16 h-16" />
                         </div>
-                        <h3 className="font-black text-gray-800 text-xs mb-2 capitalize">{p.name}</h3>
-                        <div className="flex flex-wrap justify-center gap-1 mb-3">
+                        <h3 className="font-black text-gray-800 text-xs mb-1.5 capitalize text-center">{p.name}</h3>
+                        <div className="flex flex-wrap justify-center gap-1 mb-2">
                           {p.types.map((type) => (
                             <span key={type} className="text-white text-xs px-2 py-0.5 rounded-full font-bold" style={{ backgroundColor: TYPE_COLORS[type] ?? "#adb5bd" }}>
                               {type}
                             </span>
                           ))}
                         </div>
+
+                        {/* Mini stat bars */}
+                        {p.stats && (
+                          <div className="space-y-0.5 mb-2">
+                            {p.stats.map((s) => <MiniStatBar key={s.stat.name} stat={s} />)}
+                          </div>
+                        )}
+
+                        {/* Selected moves */}
+                        {p.moves.length > 0 && (
+                          <div className="flex flex-wrap gap-1 mb-2">
+                            {p.moves.map((m) => (
+                              <span
+                                key={m.name}
+                                className="text-white text-xs px-1.5 py-0.5 rounded font-bold capitalize"
+                                style={{ backgroundColor: TYPE_COLORS[m.type] ?? "#adb5bd", fontSize: "9px" }}
+                              >
+                                {m.name.replace(/-/g, " ")}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
                         <button
                           onClick={() => removeFromTeam(p.name)}
                           className="w-full bg-red-50 text-pokemon-red text-xs font-black py-1.5 rounded-lg hover:bg-red-100 transition-colors cursor-pointer"
@@ -338,6 +622,14 @@ export default function TeamBuilder() {
             </div>
           </div>
         </div>
+
+        {/* Type Coverage */}
+        {team.length > 0 && (
+          <div className="bg-white rounded-3xl shadow-md border border-gray-100 p-6 mb-8">
+            <h2 className="text-lg font-black text-gray-700 mb-5">⚔️ Type Coverage</h2>
+            <TypeCoveragePanel team={team} />
+          </div>
+        )}
 
         {/* Save Button */}
         <div className="text-center mb-14">
@@ -377,14 +669,31 @@ export default function TeamBuilder() {
                   </div>
                   <div className="p-5">
                     <div className="flex flex-wrap gap-3 mb-4">
-                      {t.pokemons.map((name) => (
-                        <div key={name} className="flex flex-col items-center gap-1">
-                          <div className="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center">
-                            <img src={`https://img.pokemondb.net/sprites/home/normal/${name}.png`} alt={name} className="w-12 h-12" />
+                      {t.pokemons.map((p) => {
+                        const pokeName = typeof p === "string" ? p : p.name;
+                        const pokeMoves = typeof p === "string" ? [] : (p.moves ?? []);
+                        return (
+                          <div key={pokeName} className="flex flex-col items-center gap-1">
+                            <div className="w-14 h-14 bg-gray-50 rounded-xl flex items-center justify-center">
+                              <img src={`https://img.pokemondb.net/sprites/home/normal/${pokeName}.png`} alt={pokeName} className="w-12 h-12" />
+                            </div>
+                            <span className="text-xs text-gray-400 font-semibold capitalize">{pokeName}</span>
+                            {pokeMoves.length > 0 && (
+                              <div className="flex flex-wrap gap-0.5 justify-center max-w-16">
+                                {pokeMoves.map((m) => (
+                                  <span
+                                    key={m.name}
+                                    className="text-white font-bold capitalize rounded"
+                                    style={{ backgroundColor: TYPE_COLORS[m.type] ?? "#adb5bd", fontSize: "8px", padding: "1px 4px" }}
+                                  >
+                                    {m.name.replace(/-/g, " ")}
+                                  </span>
+                                ))}
+                              </div>
+                            )}
                           </div>
-                          <span className="text-xs text-gray-400 font-semibold">{name}</span>
-                        </div>
-                      ))}
+                        );
+                      })}
                     </div>
                     <button
                       onClick={() => handleDelete(t.id)}

@@ -4,6 +4,14 @@ import { toast } from "sonner";
 import { getTeams, deleteTeam, updateTeam } from "../api";
 import { useAuth } from "../context/AuthContext";
 
+const TYPE_COLORS = {
+  fire: "#f94144", water: "#277da1", grass: "#43aa8b", electric: "#f9c74f",
+  poison: "#9d4edd", flying: "#90be6d", psychic: "#f72585", bug: "#70c000",
+  rock: "#9c6644", ghost: "#7b2d8b", ice: "#48cae4", dragon: "#3a0ca3",
+  dark: "#4a4e69", steel: "#8d99ae", fairy: "#f4a2c0", fighting: "#e76f51",
+  ground: "#d4a373", normal: "#adb5bd",
+};
+
 export default function SavedTeams() {
   const { user } = useAuth();
   const [savedTeams, setSavedTeams] = useState([]);
@@ -29,7 +37,7 @@ export default function SavedTeams() {
   }, []);
 
   useEffect(() => {
-    if (user === undefined) return; // auth still initialising
+    if (user === undefined) return;
     if (!user) { setLoading(false); return; }
     loadTeams(user.uid);
   }, [user, loadTeams]);
@@ -73,7 +81,6 @@ export default function SavedTeams() {
           <p className="text-gray-400 font-semibold">Manage and rename your Pokémon squads</p>
         </div>
 
-        {/* Loading */}
         {loading && (
           <div className="text-center py-16">
             <img
@@ -86,7 +93,6 @@ export default function SavedTeams() {
           </div>
         )}
 
-        {/* Error */}
         {!loading && error && (
           <div className="text-center py-16 bg-white rounded-3xl shadow-md border border-red-100">
             <div className="text-6xl mb-4">⚠️</div>
@@ -101,7 +107,6 @@ export default function SavedTeams() {
           </div>
         )}
 
-        {/* Not logged in */}
         {!loading && !error && !user && (
           <div className="text-center py-16 bg-white rounded-3xl shadow-md border border-gray-100">
             <div className="text-6xl mb-4">🔒</div>
@@ -110,7 +115,6 @@ export default function SavedTeams() {
           </div>
         )}
 
-        {/* Empty state */}
         {!loading && !error && user && savedTeams.length === 0 && (
           <div className="text-center py-16 bg-white rounded-3xl shadow-md border border-gray-100">
             <div className="text-6xl mb-4">🎯</div>
@@ -125,7 +129,6 @@ export default function SavedTeams() {
           </div>
         )}
 
-        {/* Teams list */}
         {!loading && !error && user && savedTeams.length > 0 && (
           <div className="flex flex-col gap-5">
             {savedTeams.map((team, idx) => (
@@ -149,19 +152,45 @@ export default function SavedTeams() {
                 </div>
 
                 <div className="px-6 py-5">
-                  <div className="flex flex-wrap gap-4 mb-5">
-                    {team.pokemons.map((p) => (
-                      <Link key={p} to={`/pokemon/${p}`} className="flex flex-col items-center gap-1 group">
-                        <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center group-hover:bg-red-50 group-hover:scale-110 transition-all duration-200">
-                          <img
-                            src={`https://img.pokemondb.net/sprites/home/normal/${p}.png`}
-                            alt={p}
-                            className="w-14 h-14"
-                          />
+                  <div className="flex flex-wrap gap-5 mb-5">
+                    {team.pokemons.map((p) => {
+                      const pokeName = typeof p === "string" ? p : p.name;
+                      const pokeMoves = typeof p === "string" ? [] : (p.moves ?? []);
+                      return (
+                        <div key={pokeName} className="flex flex-col items-center gap-1.5">
+                          <Link to={`/pokemon/${pokeName}`} className="flex flex-col items-center gap-1 group">
+                            <div className="w-16 h-16 bg-gray-50 rounded-2xl flex items-center justify-center group-hover:bg-red-50 group-hover:scale-110 transition-all duration-200">
+                              <img
+                                src={`https://img.pokemondb.net/sprites/home/normal/${pokeName}.png`}
+                                alt={pokeName}
+                                className="w-14 h-14"
+                              />
+                            </div>
+                            <span className="text-xs text-gray-400 font-bold group-hover:text-pokemon-red transition-colors capitalize">
+                              {pokeName}
+                            </span>
+                          </Link>
+                          {pokeMoves.length > 0 && (
+                            <div className="flex flex-col gap-0.5 items-center">
+                              {pokeMoves.map((m) => (
+                                <span
+                                  key={m.name}
+                                  className="text-white font-bold capitalize rounded-md"
+                                  style={{
+                                    backgroundColor: TYPE_COLORS[m.type] ?? "#adb5bd",
+                                    fontSize: "9px",
+                                    padding: "2px 6px",
+                                    whiteSpace: "nowrap",
+                                  }}
+                                >
+                                  {m.name.replace(/-/g, " ")}
+                                </span>
+                              ))}
+                            </div>
+                          )}
                         </div>
-                        <span className="text-xs text-gray-400 font-bold group-hover:text-pokemon-red transition-colors">{p}</span>
-                      </Link>
-                    ))}
+                      );
+                    })}
                     {Array.from({ length: 6 - team.pokemons.length }).map((_, i) => (
                       <div key={i} className="flex flex-col items-center gap-1">
                         <div className="w-16 h-16 bg-gray-50 rounded-2xl border-2 border-dashed border-gray-200 flex items-center justify-center">
