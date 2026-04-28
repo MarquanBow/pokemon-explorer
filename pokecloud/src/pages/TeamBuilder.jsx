@@ -12,6 +12,62 @@ const TYPE_COLORS = {
   ground: "#d4a373", normal: "#adb5bd",
 };
 
+const VERSION_GROUPS = [
+  { name: "champions", label: "Pokémon Champions" },
+  { name: "scarlet-violet", label: "Scarlet / Violet" },
+  { name: "the-indigo-disk", label: "The Indigo Disk" },
+  { name: "the-teal-mask", label: "The Teal Mask" },
+  { name: "legends-arceus", label: "Legends: Arceus" },
+  { name: "brilliant-diamond-shining-pearl", label: "Brilliant Diamond / Shining Pearl" },
+  { name: "the-crown-tundra", label: "Crown Tundra" },
+  { name: "the-isle-of-armor", label: "Isle of Armor" },
+  { name: "sword-shield", label: "Sword / Shield" },
+  { name: "lets-go-pikachu-lets-go-eevee", label: "Let's Go Pikachu / Eevee" },
+  { name: "ultra-sun-ultra-moon", label: "Ultra Sun / Ultra Moon" },
+  { name: "sun-moon", label: "Sun / Moon" },
+  { name: "omega-ruby-alpha-sapphire", label: "Omega Ruby / Alpha Sapphire" },
+  { name: "x-y", label: "X / Y" },
+  { name: "black-2-white-2", label: "Black 2 / White 2" },
+  { name: "black-white", label: "Black / White" },
+  { name: "heartgold-soulsilver", label: "HeartGold / SoulSilver" },
+  { name: "platinum", label: "Platinum" },
+  { name: "diamond-pearl", label: "Diamond / Pearl" },
+  { name: "firered-leafgreen", label: "FireRed / LeafGreen" },
+  { name: "emerald", label: "Emerald" },
+  { name: "ruby-sapphire", label: "Ruby / Sapphire" },
+  { name: "crystal", label: "Crystal" },
+  { name: "gold-silver", label: "Gold / Silver" },
+  { name: "yellow", label: "Yellow" },
+  { name: "red-blue", label: "Red / Blue" },
+];
+
+const METHOD_ORDER = { "level-up": 0, machine: 1, tutor: 2, egg: 3 };
+const METHOD_LABELS = { "level-up": "Lv", machine: "TM", tutor: "Tutor", egg: "Egg" };
+
+function getAvailableMoves(allMoves, selectedGame) {
+  return allMoves
+    .map((m) => {
+      const relevant = selectedGame
+        ? m.versionDetails.filter((v) => v.versionGroup === selectedGame)
+        : m.versionDetails;
+      return { name: m.name, details: relevant };
+    })
+    .filter((m) => m.details.length > 0)
+    .sort((a, b) => {
+      if (selectedGame) {
+        const aBest = Math.min(...a.details.map((d) => METHOD_ORDER[d.method] ?? 99));
+        const bBest = Math.min(...b.details.map((d) => METHOD_ORDER[d.method] ?? 99));
+        if (aBest !== bBest) return aBest - bBest;
+        if (aBest === 0) {
+          const aLv = Math.min(...a.details.filter((d) => d.method === "level-up").map((d) => d.level));
+          const bLv = Math.min(...b.details.filter((d) => d.method === "level-up").map((d) => d.level));
+          return aLv - bLv;
+        }
+      }
+      return a.name.localeCompare(b.name);
+    });
+}
+
 const ALL_TYPES = [
   "normal","fire","water","electric","grass","ice","fighting","poison",
   "ground","flying","psychic","bug","rock","ghost","dragon","dark","steel","fairy",
@@ -179,6 +235,7 @@ export default function TeamBuilder() {
   const [searchResult, setSearchResult] = useState(null);
   const [searchError, setSearchError] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
+  const [selectedGame, setSelectedGame] = useState("");
   const [moveTypeCache, setMoveTypeCache] = useState({});
   const [loadingMove, setLoadingMove] = useState(null);
   const searchRef = useRef(null);
@@ -229,19 +286,20 @@ export default function TeamBuilder() {
       const res = await fetch(`https://pokeapi.co/api/v2/pokemon/${name.toLowerCase()}`);
       if (!res.ok) throw new Error("Pokémon not found");
       const data = await res.json();
-      const levelUpMoves = [
-        ...new Set(
-          data.moves
-            .filter((m) => m.version_group_details.some((v) => v.move_learn_method.name === "level-up"))
-            .map((m) => m.move.name)
-        ),
-      ].sort();
+      const allMoves = data.moves.map((m) => ({
+        name: m.move.name,
+        versionDetails: m.version_group_details.map((v) => ({
+          method: v.move_learn_method.name,
+          level: v.level_learned_at,
+          versionGroup: v.version_group.name,
+        })),
+      }));
       setSearchResult({
         name: data.name,
         types: data.types.map((t) => t.type.name),
         sprite: data.sprites.front_default,
         stats: data.stats,
-        availableMoves: levelUpMoves,
+        allMoves,
         selectedMoves: [],
       });
     } catch (err) {
@@ -379,6 +437,18 @@ export default function TeamBuilder() {
             className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-pokemon-red mb-5 bg-gray-50"
           />
 
+          <p className="text-xs text-gray-400 uppercase font-black tracking-widest mb-2">Game</p>
+          <select
+            value={selectedGame}
+            onChange={(e) => setSelectedGame(e.target.value)}
+            className="w-full px-4 py-3 rounded-xl border border-gray-200 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-pokemon-red mb-5 bg-gray-50 text-gray-700"
+          >
+            <option value="">Any Game (show all moves)</option>
+            {VERSION_GROUPS.map((g) => (
+              <option key={g.name} value={g.name}>{g.label}</option>
+            ))}
+          </select>
+
           <p className="text-xs text-gray-400 uppercase font-black tracking-widest mb-2">Add Pokémon</p>
           <div className="relative" ref={searchRef}>
             <div className="flex gap-3">
@@ -496,15 +566,24 @@ export default function TeamBuilder() {
 
                 {/* Move list */}
                 <div className="h-44 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50">
-                  {searchResult.availableMoves.map((moveName) => {
-                    const isSelected = searchResult.selectedMoves.find((m) => m.name === moveName);
-                    const isLoading = loadingMove === moveName;
+                  {getAvailableMoves(searchResult.allMoves, selectedGame).map((move) => {
+                    const isSelected = searchResult.selectedMoves.find((m) => m.name === move.name);
+                    const isLoading = loadingMove === move.name;
                     const isDisabled = !isSelected && searchResult.selectedMoves.length >= 4;
-                    const cachedType = moveTypeCache[moveName];
+                    const cachedType = moveTypeCache[move.name];
+                    const primaryDetail = move.details.reduce((best, d) =>
+                      (METHOD_ORDER[d.method] ?? 99) < (METHOD_ORDER[best.method] ?? 99) ? d : best,
+                      move.details[0]
+                    );
+                    const methodLabel = primaryDetail
+                      ? primaryDetail.method === "level-up"
+                        ? `Lv.${primaryDetail.level}`
+                        : METHOD_LABELS[primaryDetail.method] ?? primaryDetail.method
+                      : null;
                     return (
                       <button
-                        key={moveName}
-                        onClick={() => handleToggleMove(moveName)}
+                        key={move.name}
+                        onClick={() => handleToggleMove(move.name)}
                         disabled={isDisabled || isLoading}
                         className={`w-full text-left px-3 py-2 text-sm font-semibold capitalize flex items-center justify-between transition-colors ${
                           isSelected
@@ -514,18 +593,25 @@ export default function TeamBuilder() {
                             : "hover:bg-red-50 text-gray-700 cursor-pointer"
                         }`}
                       >
-                        <span>{moveName.replace(/-/g, " ")}</span>
-                        {isLoading && (
-                          <div className="w-3 h-3 border-2 border-pokemon-red border-t-transparent rounded-full animate-spin" />
-                        )}
-                        {!isLoading && cachedType && !isSelected && (
-                          <span
-                            className="text-xs text-white px-2 py-0.5 rounded-full font-bold"
-                            style={{ backgroundColor: TYPE_COLORS[cachedType] ?? "#adb5bd" }}
-                          >
-                            {cachedType}
-                          </span>
-                        )}
+                        <span>{move.name.replace(/-/g, " ")}</span>
+                        <span className="flex items-center gap-1.5 shrink-0">
+                          {isLoading && (
+                            <div className="w-3 h-3 border-2 border-pokemon-red border-t-transparent rounded-full animate-spin" />
+                          )}
+                          {!isLoading && cachedType && !isSelected && (
+                            <span
+                              className="text-xs text-white px-1.5 py-0.5 rounded font-bold"
+                              style={{ backgroundColor: TYPE_COLORS[cachedType] ?? "#adb5bd" }}
+                            >
+                              {cachedType}
+                            </span>
+                          )}
+                          {selectedGame && methodLabel && !isSelected && (
+                            <span className="text-xs font-bold text-gray-400 bg-gray-200 px-1.5 py-0.5 rounded">
+                              {methodLabel}
+                            </span>
+                          )}
+                        </span>
                       </button>
                     );
                   })}
