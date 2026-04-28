@@ -12,9 +12,13 @@ export default function PokedexExplorer() {
   const [searchTerm, setSearchTerm] = useState("");
 
   const [allPokemonInGen, setAllPokemonInGen] = useState([]);
-  const [filteredPokemon, setFilteredPokemon] = useState([]);
   const [typeFilteredNames, setTypeFilteredNames] = useState(null);
   const [abilityFilteredNames, setAbilityFilteredNames] = useState(null);
+
+  const [filteredPokemon, setFilteredPokemon] = useState([]);
+  const [genLoading, setGenLoading] = useState(false);
+  const [typeLoading, setTypeLoading] = useState(false);
+  const [abilityLoading, setAbilityLoading] = useState(false);
 
   useEffect(() => {
     fetch("https://pokeapi.co/api/v2/generation")
@@ -27,31 +31,74 @@ export default function PokedexExplorer() {
 
   useEffect(() => {
     if (!selectedGeneration) { setAllPokemonInGen([]); return; }
-    fetch(selectedGeneration).then((r) => r.json()).then((d) =>
-      setAllPokemonInGen(d.pokemon_species.sort((a, b) => a.name.localeCompare(b.name)))
-    );
+    setGenLoading(true);
+    fetch(selectedGeneration)
+      .then((r) => r.json())
+      .then((d) => setAllPokemonInGen(d.pokemon_species.sort((a, b) => a.name.localeCompare(b.name))))
+      .finally(() => setGenLoading(false));
   }, [selectedGeneration]);
 
   useEffect(() => {
     if (!selectedType) { setTypeFilteredNames(null); return; }
+    setTypeLoading(true);
     fetch(`https://pokeapi.co/api/v2/type/${selectedType}`)
-      .then((r) => r.json()).then((d) => setTypeFilteredNames(d.pokemon.map((p) => p.pokemon.name)));
+      .then((r) => r.json())
+      .then((d) => setTypeFilteredNames(d.pokemon.map((p) => p.pokemon.name)))
+      .finally(() => setTypeLoading(false));
   }, [selectedType]);
 
   useEffect(() => {
     if (!selectedAbility) { setAbilityFilteredNames(null); return; }
+    setAbilityLoading(true);
     fetch(`https://pokeapi.co/api/v2/ability/${selectedAbility}`)
-      .then((r) => r.json()).then((d) => setAbilityFilteredNames(d.pokemon.map((p) => p.pokemon.name)));
+      .then((r) => r.json())
+      .then((d) => setAbilityFilteredNames(d.pokemon.map((p) => p.pokemon.name)))
+      .finally(() => setAbilityLoading(false));
   }, [selectedAbility]);
 
   useEffect(() => {
-    if (allPokemonInGen.length === 0) { setFilteredPokemon([]); return; }
-    let filtered = allPokemonInGen.map((p) => p.name);
-    if (typeFilteredNames) filtered = filtered.filter((n) => typeFilteredNames.includes(n));
-    if (abilityFilteredNames) filtered = filtered.filter((n) => abilityFilteredNames.includes(n));
-    if (searchTerm) filtered = filtered.filter((n) => n.toLowerCase().includes(searchTerm.toLowerCase()));
-    setFilteredPokemon(filtered.map((n) => allPokemonInGen.find((p) => p.name === n)));
-  }, [searchTerm, allPokemonInGen, typeFilteredNames, abilityFilteredNames]);
+    const anyFilterActive = selectedGeneration || selectedType || selectedAbility;
+    if (!anyFilterActive) { setFilteredPokemon([]); return; }
+
+    // Wait for any in-flight filter requests before computing
+    if (selectedGeneration && genLoading) return;
+    if (selectedType && typeLoading) return;
+    if (selectedAbility && abilityLoading) return;
+
+    // Build candidate list as the intersection of all active filters
+    let candidates = null;
+
+    if (selectedGeneration && allPokemonInGen.length > 0) {
+      candidates = allPokemonInGen.map((p) => p.name);
+    }
+    if (typeFilteredNames !== null) {
+      candidates = candidates
+        ? candidates.filter((n) => typeFilteredNames.includes(n))
+        : [...typeFilteredNames];
+    }
+    if (abilityFilteredNames !== null) {
+      candidates = candidates
+        ? candidates.filter((n) => abilityFilteredNames.includes(n))
+        : [...abilityFilteredNames];
+    }
+    if (searchTerm) {
+      candidates = (candidates ?? []).filter((n) =>
+        n.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    setFilteredPokemon((candidates ?? []).map((name) => ({ name })));
+  }, [
+    searchTerm, allPokemonInGen, typeFilteredNames, abilityFilteredNames,
+    selectedGeneration, selectedType, selectedAbility,
+    genLoading, typeLoading, abilityLoading,
+  ]);
+
+  const anyFilterActive = !!(selectedGeneration || selectedType || selectedAbility);
+  const isLoading =
+    (selectedGeneration && genLoading) ||
+    (selectedType && typeLoading) ||
+    (selectedAbility && abilityLoading);
 
   const selectClass =
     "px-4 py-2.5 rounded-xl border border-gray-200 bg-white text-gray-700 text-sm font-semibold focus:outline-none focus:ring-2 focus:ring-pokemon-red shadow-sm hover:border-red-200 transition-colors";
@@ -108,7 +155,7 @@ export default function PokedexExplorer() {
         </div>
 
         {/* Results count */}
-        {filteredPokemon.length > 0 && (
+        {!isLoading && filteredPokemon.length > 0 && (
           <p className="text-center text-sm text-gray-400 font-semibold mb-5">
             Showing <span className="text-pokemon-red font-black">{filteredPokemon.length}</span> Pokémon
           </p>
@@ -116,10 +163,19 @@ export default function PokedexExplorer() {
 
         {/* Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-4">
-          {!selectedGeneration ? (
+          {!anyFilterActive ? (
             <div className="col-span-full text-center py-16">
               <div className="text-6xl mb-3">🌎</div>
-              <p className="text-gray-400 font-semibold">Pick a generation to start exploring!</p>
+              <p className="text-gray-400 font-semibold">Pick a generation, type, or ability to start exploring!</p>
+            </div>
+          ) : isLoading ? (
+            <div className="col-span-full text-center py-16">
+              <img
+                src="https://raw.githubusercontent.com/PokeAPI/sprites/master/sprites/items/poke-ball.png"
+                alt="Loading"
+                className="w-12 mx-auto mb-3 animate-spin"
+              />
+              <p className="text-gray-400 font-semibold">Loading Pokémon...</p>
             </div>
           ) : filteredPokemon.length === 0 ? (
             <div className="col-span-full text-center py-16">
