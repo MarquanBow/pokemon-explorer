@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { saveTeam, getTeams, deleteTeam, updateTeam } from "../api";
@@ -13,7 +13,7 @@ const TYPE_COLORS = {
 };
 
 const VERSION_GROUPS = [
-  { name: "champions", label: "Pokémon Champions" },
+  { name: "champions", label: "Pokémon Champions", filterAs: "scarlet-violet" },
   { name: "scarlet-violet", label: "Scarlet / Violet" },
   { name: "the-indigo-disk", label: "The Indigo Disk" },
   { name: "the-teal-mask", label: "The Teal Mask" },
@@ -236,9 +236,18 @@ export default function TeamBuilder() {
   const [searchError, setSearchError] = useState("");
   const [searchLoading, setSearchLoading] = useState(false);
   const [selectedGame, setSelectedGame] = useState("");
+  const effectiveGame = useMemo(() => {
+    const g = VERSION_GROUPS.find((vg) => vg.name === selectedGame);
+    return g?.filterAs ?? selectedGame;
+  }, [selectedGame]);
   const [moveTypeCache, setMoveTypeCache] = useState({});
   const [loadingMove, setLoadingMove] = useState(null);
   const searchRef = useRef(null);
+
+  const availableMoves = useMemo(
+    () => (searchResult ? getAvailableMoves(searchResult.allMoves, effectiveGame) : []),
+    [searchResult, effectiveGame]
+  );
 
   useEffect(() => {
     if (!user) { setSavedTeams([]); setTeam([]); setTeamName(""); return; }
@@ -566,7 +575,11 @@ export default function TeamBuilder() {
 
                 {/* Move list */}
                 <div className="h-44 overflow-y-auto rounded-xl border border-gray-100 bg-gray-50">
-                  {getAvailableMoves(searchResult.allMoves, selectedGame).map((move) => {
+                  {availableMoves.length === 0 && effectiveGame ? (
+                    <p className="text-gray-400 text-sm font-semibold p-4 text-center">
+                      No move data for this game in the Pokédex API.
+                    </p>
+                  ) : availableMoves.map((move) => {
                     const isSelected = searchResult.selectedMoves.find((m) => m.name === move.name);
                     const isLoading = loadingMove === move.name;
                     const isDisabled = !isSelected && searchResult.selectedMoves.length >= 4;
